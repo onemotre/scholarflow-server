@@ -1,0 +1,65 @@
+package config
+
+import (
+	"os"
+	"strconv"
+)
+
+type Config struct {
+	HTTPAddr       string
+	DatabaseURL    string
+	RedisAddr      string
+	MinIOEndpoint  string
+	MinIOAccessKey string
+	MinIOSecretKey string
+	MinIOBucket    string
+	MinIOUseSSL    bool
+	GROBIDURL      string
+	MaxUploadBytes int64
+}
+
+func Load() Config {
+	return Config{
+		HTTPAddr:       envString("HTTP_ADDR", ":8080"),
+		DatabaseURL:    envString("DATABASE_URL", "postgres://scholarflow:scholarflow@localhost:5432/scholarflow?sslmode=disable"),
+		RedisAddr:      envString("REDIS_ADDR", "localhost:6379"),
+		MinIOEndpoint:  envString("MINIO_ENDPOINT", "localhost:9000"),
+		MinIOAccessKey: envString("MINIO_ACCESS_KEY", "scholarflow"),
+		MinIOSecretKey: envString("MINIO_SECRET_KEY", "scholarflow-secret"),
+		MinIOBucket:    envString("MINIO_BUCKET", "scholarflow"),
+		MinIOUseSSL:    envBool("MINIO_USE_SSL", false),
+		GROBIDURL:      envString("GROBID_URL", "http://localhost:8070"),
+		MaxUploadBytes: envInt64("MAX_UPLOAD_BYTES", 50*1024*1024),
+	}
+}
+
+func envString(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envInt64(key string, fallback int64) int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}

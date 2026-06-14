@@ -1,0 +1,59 @@
+services:
+  api:
+    build: .
+    command: ["/app/server"]
+    env_file: .env.example
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - grobid
+
+  worker:
+    build: .
+    command: ["/app/worker"]
+    env_file: .env.example
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - grobid
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: scholarflow
+      POSTGRES_PASSWORD: scholarflow
+      POSTGRES_DB: scholarflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: scholarflow
+      MINIO_ROOT_PASSWORD: scholarflow-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  grobid:
+    image: lfoppiano/grobid:0.8.0
+    ports:
+      - "8070:8070"
+
+volumes:
+  postgres_data:
+  minio_data:
