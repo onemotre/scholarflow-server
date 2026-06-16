@@ -46,3 +46,33 @@ RETURNING *;
 
 -- name: GetProcessingJob :one
 SELECT * FROM paper_processing_jobs WHERE id = $1;
+
+-- name: GetPaperAssetByType :one
+SELECT * FROM paper_assets
+WHERE paper_id = $1 AND asset_type = $2
+ORDER BY created_at DESC
+LIMIT 1;
+
+-- name: DeletePaperAuthors :exec
+DELETE FROM paper_authors WHERE paper_id = $1;
+
+-- name: CreatePaperAuthor :one
+INSERT INTO paper_authors (paper_id, author_order, display_name, orcid)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: DeletePaperSections :exec
+DELETE FROM paper_sections WHERE paper_id = $1;
+
+-- name: CreatePaperSection :one
+INSERT INTO paper_sections (paper_id, section_order, heading, text, page_start, page_end, grobid_path)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING *;
+
+-- name: DeletePaperReferences :exec
+DELETE FROM paper_references WHERE paper_id = $1;
+
+-- name: CreatePaperReference :one
+INSERT INTO paper_references (paper_id, reference_order, title, authors, venue, year, doi, raw_text)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING *;

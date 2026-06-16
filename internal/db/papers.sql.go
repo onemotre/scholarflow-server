@@ -82,6 +82,121 @@ func (q *Queries) CreatePaperAsset(ctx context.Context, arg CreatePaperAssetPara
 	return i, err
 }
 
+const createPaperAuthor = `-- name: CreatePaperAuthor :one
+INSERT INTO paper_authors (paper_id, author_order, display_name, orcid)
+VALUES ($1, $2, $3, $4)
+RETURNING id, paper_id, author_order, display_name, orcid, openalex_author_id
+`
+
+type CreatePaperAuthorParams struct {
+	PaperID     uuid.UUID
+	AuthorOrder int32
+	DisplayName string
+	Orcid       *string
+}
+
+func (q *Queries) CreatePaperAuthor(ctx context.Context, arg CreatePaperAuthorParams) (PaperAuthor, error) {
+	row := q.db.QueryRow(ctx, createPaperAuthor,
+		arg.PaperID,
+		arg.AuthorOrder,
+		arg.DisplayName,
+		arg.Orcid,
+	)
+	var i PaperAuthor
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.AuthorOrder,
+		&i.DisplayName,
+		&i.Orcid,
+		&i.OpenalexAuthorID,
+	)
+	return i, err
+}
+
+const createPaperReference = `-- name: CreatePaperReference :one
+INSERT INTO paper_references (paper_id, reference_order, title, authors, venue, year, doi, raw_text)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, paper_id, reference_order, title, authors, venue, year, doi, raw_text
+`
+
+type CreatePaperReferenceParams struct {
+	PaperID        uuid.UUID
+	ReferenceOrder int32
+	Title          *string
+	Authors        []byte
+	Venue          *string
+	Year           *int32
+	Doi            *string
+	RawText        *string
+}
+
+func (q *Queries) CreatePaperReference(ctx context.Context, arg CreatePaperReferenceParams) (PaperReference, error) {
+	row := q.db.QueryRow(ctx, createPaperReference,
+		arg.PaperID,
+		arg.ReferenceOrder,
+		arg.Title,
+		arg.Authors,
+		arg.Venue,
+		arg.Year,
+		arg.Doi,
+		arg.RawText,
+	)
+	var i PaperReference
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.ReferenceOrder,
+		&i.Title,
+		&i.Authors,
+		&i.Venue,
+		&i.Year,
+		&i.Doi,
+		&i.RawText,
+	)
+	return i, err
+}
+
+const createPaperSection = `-- name: CreatePaperSection :one
+INSERT INTO paper_sections (paper_id, section_order, heading, text, page_start, page_end, grobid_path)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, paper_id, section_order, heading, text, page_start, page_end, grobid_path
+`
+
+type CreatePaperSectionParams struct {
+	PaperID      uuid.UUID
+	SectionOrder int32
+	Heading      *string
+	Text         string
+	PageStart    *int32
+	PageEnd      *int32
+	GrobidPath   *string
+}
+
+func (q *Queries) CreatePaperSection(ctx context.Context, arg CreatePaperSectionParams) (PaperSection, error) {
+	row := q.db.QueryRow(ctx, createPaperSection,
+		arg.PaperID,
+		arg.SectionOrder,
+		arg.Heading,
+		arg.Text,
+		arg.PageStart,
+		arg.PageEnd,
+		arg.GrobidPath,
+	)
+	var i PaperSection
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.SectionOrder,
+		&i.Heading,
+		&i.Text,
+		&i.PageStart,
+		&i.PageEnd,
+		&i.GrobidPath,
+	)
+	return i, err
+}
+
 const createProcessingJob = `-- name: CreateProcessingJob :one
 INSERT INTO paper_processing_jobs (paper_id, status)
 VALUES ($1, $2)
@@ -110,6 +225,33 @@ func (q *Queries) CreateProcessingJob(ctx context.Context, arg CreateProcessingJ
 	return i, err
 }
 
+const deletePaperAuthors = `-- name: DeletePaperAuthors :exec
+DELETE FROM paper_authors WHERE paper_id = $1
+`
+
+func (q *Queries) DeletePaperAuthors(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperAuthors, paperID)
+	return err
+}
+
+const deletePaperReferences = `-- name: DeletePaperReferences :exec
+DELETE FROM paper_references WHERE paper_id = $1
+`
+
+func (q *Queries) DeletePaperReferences(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperReferences, paperID)
+	return err
+}
+
+const deletePaperSections = `-- name: DeletePaperSections :exec
+DELETE FROM paper_sections WHERE paper_id = $1
+`
+
+func (q *Queries) DeletePaperSections(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperSections, paperID)
+	return err
+}
+
 const getPaper = `-- name: GetPaper :one
 SELECT id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at FROM papers WHERE id = $1
 `
@@ -128,6 +270,35 @@ func (q *Queries) GetPaper(ctx context.Context, id uuid.UUID) (Paper, error) {
 		&i.UploadedFilename,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPaperAssetByType = `-- name: GetPaperAssetByType :one
+SELECT id, paper_id, asset_type, storage_bucket, storage_key, content_type, size_bytes, checksum, created_at FROM paper_assets
+WHERE paper_id = $1 AND asset_type = $2
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetPaperAssetByTypeParams struct {
+	PaperID   uuid.UUID
+	AssetType string
+}
+
+func (q *Queries) GetPaperAssetByType(ctx context.Context, arg GetPaperAssetByTypeParams) (PaperAsset, error) {
+	row := q.db.QueryRow(ctx, getPaperAssetByType, arg.PaperID, arg.AssetType)
+	var i PaperAsset
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.AssetType,
+		&i.StorageBucket,
+		&i.StorageKey,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Checksum,
+		&i.CreatedAt,
 	)
 	return i, err
 }
