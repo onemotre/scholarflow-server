@@ -1,0 +1,85 @@
+package jobs
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+
+	"github.com/google/uuid"
+
+	"scholarflow_server/internal/reader"
+)
+
+const cardSchemaVersion = "1.0"
+
+type ReadSection struct {
+	ID      uuid.UUID
+	Label   string
+	Heading string
+	Text    string
+}
+
+type ReadContext struct {
+	Title    string
+	Abstract string
+	Sections []ReadSection
+}
+
+type ReadRepository interface {
+	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error
+	GetReadContext(ctx context.Context, paperID uuid.UUID) (ReadContext, error)
+	SavePaperCard(ctx context.Context, paperID uuid.UUID, model, schemaVersion string, card reader.PaperCard, sectionIDByLabel map[string]uuid.UUID) error
+}
+
+type ReadPipeline struct {
+	repo   ReadRepository
+	reader reader.Reader
+	model  string
+}
+
+func NewReadPipeline(repo ReadRepository, rdr reader.Reader, model string) *ReadPipeline {
+	return &ReadPipeline{repo: repo, reader: rdr, model: model}
+}
+
+func (p *ReadPipeline) ReadPaper(ctx context.Context, payload ProcessPaperPayload) error {
+	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusReading, nil, 0); err != nil {
+		return fmt.Errorf("mark job reading: %w", err)
+	}
+	err := p.read(ctx, payload)
+	if err != nil {
+		message := err.Error()
+		if markErr := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusFailed, &message, 1); markErr != nil {
+			return fmt.Errorf("%w; mark job failed: %v", err, markErr)
+		}
+		return err
+	}
+	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusCompleted, nil, 0); err != nil {
+		return fmt.Errorf("mark job completed: %w", err)
+	}
+	return nil
+}
+
+func (p *ReadPipeline) read(ctx context.Context, payload ProcessPaperPayload) error {
+	rc, err := p.repo.GetReadContext(ctx, payload.PaperID)
+	if err != nil {
+		return fmt.Errorf("get read context: %w", err)
+	}
+	input := reader.Context{Title: rc.Title, Abstract: rc.Abstract}
+	sectionIDByLabel := make(map[string]uuid.UUID, len(rc.Sections))
+	for _, s := range rc.Sections {
+		label := s.Label
+		if label == "" {
+			label = strconv.Itoa(len(input.Sections) + 1)
+		}
+		sectionIDByLabel[label] = s.ID
+		input.Sections = append(input.Sections, reader.Section{Label: label, Heading: s.Heading, Text: s.Text})
+	}
+	card, err := p.reader.ReadPaper(ctx, input)
+	if err != nil {
+		return fmt.Errorf("read paper: %w", err)
+	}
+	if err := p.repo.SavePaperCard(ctx, payload.PaperID, p.model, cardSchemaVersion, card, sectionIDByLabel); err != nil {
+		return fmt.Errorf("save paper card: %w", err)
+	}
+	return nil
+}

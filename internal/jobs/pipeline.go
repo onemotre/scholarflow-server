@@ -14,6 +14,8 @@ import (
 const (
 	StatusProcessing = "processing"
 	StatusParsed     = "parsed"
+	StatusReading    = "reading"
+	StatusCompleted  = "completed"
 	StatusFailed     = "failed"
 )
 

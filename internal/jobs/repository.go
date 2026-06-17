@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"scholarflow_server/internal/db"
 	"scholarflow_server/internal/parser"
+	"scholarflow_server/internal/reader"
 	"scholarflow_server/internal/storage"
 )
 
@@ -147,4 +150,75 @@ func int32Pointer(value int32) *int32 {
 		return nil
 	}
 	return &value
+}
+
+func (r *SQLRepository) GetReadContext(ctx context.Context, paperID uuid.UUID) (ReadContext, error) {
+	paper, err := r.queries.GetPaper(ctx, paperID)
+	if err != nil {
+		return ReadContext{}, fmt.Errorf("get paper: %w", err)
+	}
+	sections, err := r.queries.ListPaperSections(ctx, paperID)
+	if err != nil {
+		return ReadContext{}, fmt.Errorf("list sections: %w", err)
+	}
+	rc := ReadContext{Title: stringValue(paper.Title), Abstract: stringValue(paper.Abstract)}
+	for _, s := range sections {
+		rc.Sections = append(rc.Sections, ReadSection{
+			ID:      s.ID,
+			Label:   strconv.FormatInt(int64(s.SectionOrder), 10),
+			Heading: stringValue(s.Heading),
+			Text:    s.Text,
+		})
+	}
+	return rc, nil
+}
+
+func (r *SQLRepository) SavePaperCard(ctx context.Context, paperID uuid.UUID, model, schemaVersion string, card reader.PaperCard, sectionIDByLabel map[string]uuid.UUID) error {
+	content, err := json.Marshal(card)
+	if err != nil {
+		return fmt.Errorf("marshal card: %w", err)
+	}
+	if err := r.queries.DeletePaperCardsByPaper(ctx, paperID); err != nil {
+		return fmt.Errorf("delete existing cards: %w", err)
+	}
+	created, err := r.queries.CreatePaperCard(ctx, db.CreatePaperCardParams{
+		PaperID:       paperID,
+		SchemaVersion: schemaVersion,
+		Model:         model,
+		ContentJson:   content,
+	})
+	if err != nil {
+		return fmt.Errorf("create card: %w", err)
+	}
+	cardID := pgtype.UUID{Bytes: created.ID, Valid: true}
+	for _, ev := range card.Evidence {
+		sectionID := pgtype.UUID{}
+		if id, ok := sectionIDByLabel[ev.SectionID]; ok {
+			sectionID = pgtype.UUID{Bytes: id, Valid: true}
+		}
+		_, err := r.queries.CreatePaperEvidence(ctx, db.CreatePaperEvidenceParams{
+			PaperID:      paperID,
+			PaperCardID:  cardID,
+			ClaimKey:     ev.ClaimKey,
+			EvidenceType: ev.EvidenceType,
+			SectionID:    sectionID,
+			AssetID:      pgtype.UUID{},
+			Page:         intPointer(ev.Page),
+			Locator:      stringPointer(ev.Locator),
+			Snippet:      stringPointer(ev.Snippet),
+			Confidence:   ev.Confidence,
+		})
+		if err != nil {
+			return fmt.Errorf("create evidence: %w", err)
+		}
+	}
+	return nil
+}
+
+func intPointer(value *int) *int32 {
+	if value == nil {
+		return nil
+	}
+	v := int32(*value)
+	return &v
 }
