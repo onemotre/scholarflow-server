@@ -41,6 +41,7 @@ type PaperDetail struct {
 	Authors          []AuthorDTO    `json:"authors"`
 	Sections         []SectionDTO   `json:"sections"`
 	References       []ReferenceDTO `json:"references"`
+	Card             json.RawMessage `json:"card,omitempty"`
 }
 
 type AuthorDTO struct {
@@ -161,6 +162,12 @@ func (r *SQLReadRepository) GetPaperDetail(ctx context.Context, paperID uuid.UUI
 			DOI:     ref.Doi,
 			RawText: ref.RawText,
 		})
+	}
+	card, err := r.queries.GetLatestPaperCard(ctx, paperID)
+	if err == nil {
+		detail.Card = json.RawMessage(card.ContentJson)
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return PaperDetail{}, err
 	}
 	return detail, nil
 }

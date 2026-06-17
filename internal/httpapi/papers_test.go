@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -96,10 +97,11 @@ func TestGetPaperReturnsDetail(t *testing.T) {
 	title := "Test Paper"
 	reader := &fakeReader{paper: papers.PaperDetail{
 		PaperID:  paperID,
-		Status:   "parsed",
+		Status:   "completed",
 		Title:    &title,
 		Authors:  []papers.AuthorDTO{{Order: 1, DisplayName: "Ada"}},
 		Sections: []papers.SectionDTO{{Order: 1, Text: "Body"}},
+		Card:     json.RawMessage(`{"background":"bg"}`),
 	}}
 	srv := newTestServer(reader)
 	defer srv.Close()
@@ -124,6 +126,9 @@ func TestGetPaperReturnsDetail(t *testing.T) {
 	}
 	if reader.gotPaperID != paperID {
 		t.Fatalf("paper id passed = %s, want %s", reader.gotPaperID, paperID)
+	}
+	if got.Card == nil || !strings.Contains(string(got.Card), "bg") {
+		t.Fatalf("card = %s", string(got.Card))
 	}
 }
 
