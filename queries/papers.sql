@@ -85,3 +85,19 @@ SELECT * FROM paper_sections WHERE paper_id = $1 ORDER BY section_order;
 
 -- name: ListPaperReferences :many
 SELECT * FROM paper_references WHERE paper_id = $1 ORDER BY reference_order;
+
+-- name: CreatePaperCard :one
+INSERT INTO paper_cards (paper_id, schema_version, model, content_json)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: CreatePaperEvidence :one
+INSERT INTO paper_evidence (paper_id, paper_card_id, claim_key, evidence_type, section_id, asset_id, page, locator, snippet, confidence)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING *;
+
+-- name: DeletePaperCardsByPaper :exec
+DELETE FROM paper_cards WHERE paper_id = $1;
+
+-- name: GetLatestPaperCard :one
+SELECT * FROM paper_cards WHERE paper_id = $1 ORDER BY created_at DESC LIMIT 1;

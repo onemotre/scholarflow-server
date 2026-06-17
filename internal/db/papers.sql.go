@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createPaper = `-- name: CreatePaper :one
@@ -110,6 +111,88 @@ func (q *Queries) CreatePaperAuthor(ctx context.Context, arg CreatePaperAuthorPa
 		&i.DisplayName,
 		&i.Orcid,
 		&i.OpenalexAuthorID,
+	)
+	return i, err
+}
+
+const createPaperCard = `-- name: CreatePaperCard :one
+INSERT INTO paper_cards (paper_id, schema_version, model, content_json)
+VALUES ($1, $2, $3, $4)
+RETURNING id, paper_id, schema_version, model, content_json, created_at
+`
+
+type CreatePaperCardParams struct {
+	PaperID       uuid.UUID
+	SchemaVersion string
+	Model         string
+	ContentJson   []byte
+}
+
+func (q *Queries) CreatePaperCard(ctx context.Context, arg CreatePaperCardParams) (PaperCard, error) {
+	row := q.db.QueryRow(ctx, createPaperCard,
+		arg.PaperID,
+		arg.SchemaVersion,
+		arg.Model,
+		arg.ContentJson,
+	)
+	var i PaperCard
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.SchemaVersion,
+		&i.Model,
+		&i.ContentJson,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createPaperEvidence = `-- name: CreatePaperEvidence :one
+INSERT INTO paper_evidence (paper_id, paper_card_id, claim_key, evidence_type, section_id, asset_id, page, locator, snippet, confidence)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, paper_id, paper_card_id, claim_key, evidence_type, section_id, asset_id, page, locator, snippet, confidence, created_at
+`
+
+type CreatePaperEvidenceParams struct {
+	PaperID      uuid.UUID
+	PaperCardID  pgtype.UUID
+	ClaimKey     string
+	EvidenceType string
+	SectionID    pgtype.UUID
+	AssetID      pgtype.UUID
+	Page         *int32
+	Locator      *string
+	Snippet      *string
+	Confidence   float64
+}
+
+func (q *Queries) CreatePaperEvidence(ctx context.Context, arg CreatePaperEvidenceParams) (PaperEvidence, error) {
+	row := q.db.QueryRow(ctx, createPaperEvidence,
+		arg.PaperID,
+		arg.PaperCardID,
+		arg.ClaimKey,
+		arg.EvidenceType,
+		arg.SectionID,
+		arg.AssetID,
+		arg.Page,
+		arg.Locator,
+		arg.Snippet,
+		arg.Confidence,
+	)
+	var i PaperEvidence
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.PaperCardID,
+		&i.ClaimKey,
+		&i.EvidenceType,
+		&i.SectionID,
+		&i.AssetID,
+		&i.Page,
+		&i.Locator,
+		&i.Snippet,
+		&i.Confidence,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -234,6 +317,15 @@ func (q *Queries) DeletePaperAuthors(ctx context.Context, paperID uuid.UUID) err
 	return err
 }
 
+const deletePaperCardsByPaper = `-- name: DeletePaperCardsByPaper :exec
+DELETE FROM paper_cards WHERE paper_id = $1
+`
+
+func (q *Queries) DeletePaperCardsByPaper(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperCardsByPaper, paperID)
+	return err
+}
+
 const deletePaperReferences = `-- name: DeletePaperReferences :exec
 DELETE FROM paper_references WHERE paper_id = $1
 `
@@ -250,6 +342,24 @@ DELETE FROM paper_sections WHERE paper_id = $1
 func (q *Queries) DeletePaperSections(ctx context.Context, paperID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deletePaperSections, paperID)
 	return err
+}
+
+const getLatestPaperCard = `-- name: GetLatestPaperCard :one
+SELECT id, paper_id, schema_version, model, content_json, created_at FROM paper_cards WHERE paper_id = $1 ORDER BY created_at DESC LIMIT 1
+`
+
+func (q *Queries) GetLatestPaperCard(ctx context.Context, paperID uuid.UUID) (PaperCard, error) {
+	row := q.db.QueryRow(ctx, getLatestPaperCard, paperID)
+	var i PaperCard
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.SchemaVersion,
+		&i.Model,
+		&i.ContentJson,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getPaper = `-- name: GetPaper :one
