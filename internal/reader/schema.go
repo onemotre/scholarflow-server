@@ -37,6 +37,7 @@ type Context struct {
 }
 
 type Section struct {
+	Label   string
 	Heading string
 	Text    string
 }
