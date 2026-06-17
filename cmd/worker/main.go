@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/hibiken/asynq"
 
@@ -10,6 +11,7 @@ import (
 	dbpkg "scholarflow_server/internal/db"
 	"scholarflow_server/internal/jobs"
 	"scholarflow_server/internal/parser"
+	"scholarflow_server/internal/reader"
 	"scholarflow_server/internal/storage"
 )
 
@@ -32,11 +34,30 @@ func main() {
 	}
 
 	repo := jobs.NewSQLRepository(dbpkg.New(pool))
-	pipeline := jobs.NewPipeline(repo, store, parser.NewGROBIDParser(cfg.GROBIDURL))
+	redisOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr}
 
-	server := asynq.NewServer(asynq.RedisClientOpt{Addr: cfg.RedisAddr}, asynq.Config{Concurrency: 2})
 	mux := asynq.NewServeMux()
+
+	readerConfigured := cfg.OpenAIBaseURL != "" && cfg.OpenAIAPIKey != ""
+	var readEnqueuer jobs.ReadEnqueuer
+	if readerConfigured {
+		client := asynq.NewClient(redisOpt)
+		defer client.Close()
+		enqueuer := jobs.NewEnqueuer(client)
+		readEnqueuer = enqueuer
+
+		rdr := reader.NewOpenAIReader(cfg.OpenAIBaseURL, cfg.OpenAIAPIKey, cfg.OpenAIModel, cfg.OpenAIMaxInputChars, time.Duration(cfg.OpenAITimeoutSeconds)*time.Second)
+		readPipeline := jobs.NewReadPipeline(repo, rdr, cfg.OpenAIModel)
+		jobs.NewReadProcessor(readPipeline).Register(mux)
+		log.Printf("reader enabled model=%s base=%s", cfg.OpenAIModel, cfg.OpenAIBaseURL)
+	} else {
+		log.Printf("reader disabled (OPENAI_BASE_URL / OPENAI_API_KEY not set); jobs stop at parsed")
+	}
+
+	pipeline := jobs.NewPipeline(repo, store, parser.NewGROBIDParser(cfg.GROBIDURL), readEnqueuer)
 	jobs.NewProcessor(pipeline).Register(mux)
+
+	server := asynq.NewServer(redisOpt, asynq.Config{Concurrency: 2})
 	log.Printf("starting worker redis=%s grobid=%s", cfg.RedisAddr, cfg.GROBIDURL)
 	if err := server.Run(mux); err != nil {
 		log.Fatal(err)
