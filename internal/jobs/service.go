@@ -26,3 +26,15 @@ func (e *Enqueuer) EnqueuePaperProcessing(ctx context.Context, paperID uuid.UUID
 	}
 	return info.ID, nil
 }
+
+func (e *Enqueuer) EnqueuePaperRead(ctx context.Context, paperID uuid.UUID, jobID uuid.UUID) (string, error) {
+	task, err := NewReadPaperTask(paperID, jobID)
+	if err != nil {
+		return "", err
+	}
+	info, err := e.client.EnqueueContext(ctx, task)
+	if err != nil {
+		return "", err
+	}
+	return info.ID, nil
+}

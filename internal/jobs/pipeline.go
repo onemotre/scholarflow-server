@@ -26,14 +26,19 @@ type PipelineRepository interface {
 	SaveParsedPaper(ctx context.Context, paperID uuid.UUID, parsed parser.ParsedPaper) error
 }
 
-type Pipeline struct {
-	repo   PipelineRepository
-	store  storage.Store
-	parser parser.Parser
+type ReadEnqueuer interface {
+	EnqueuePaperRead(ctx context.Context, paperID, jobID uuid.UUID) (string, error)
 }
 
-func NewPipeline(repo PipelineRepository, store storage.Store, parser parser.Parser) *Pipeline {
-	return &Pipeline{repo: repo, store: store, parser: parser}
+type Pipeline struct {
+	repo         PipelineRepository
+	store        storage.Store
+	parser       parser.Parser
+	readEnqueuer ReadEnqueuer
+}
+
+func NewPipeline(repo PipelineRepository, store storage.Store, parser parser.Parser, readEnqueuer ReadEnqueuer) *Pipeline {
+	return &Pipeline{repo: repo, store: store, parser: parser, readEnqueuer: readEnqueuer}
 }
 
 func (p *Pipeline) ProcessPaper(ctx context.Context, payload ProcessPaperPayload) error {
@@ -50,6 +55,11 @@ func (p *Pipeline) ProcessPaper(ctx context.Context, payload ProcessPaperPayload
 	}
 	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusParsed, nil, 0); err != nil {
 		return fmt.Errorf("mark job parsed: %w", err)
+	}
+	if p.readEnqueuer != nil {
+		if _, err := p.readEnqueuer.EnqueuePaperRead(ctx, payload.PaperID, payload.JobID); err != nil {
+			return fmt.Errorf("enqueue paper read: %w", err)
+		}
 	}
 	return nil
 }

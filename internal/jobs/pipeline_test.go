@@ -117,7 +117,7 @@ func TestPipelineProcessesPaperToParsed(t *testing.T) {
 		Sections:   []parser.Section{{Order: 1, Heading: "Intro", Text: "Body"}},
 		References: []parser.Reference{{Order: 1, Title: "Reference", Authors: []string{"Grace Hopper"}, Year: 1952}},
 	}}
-	service := NewPipeline(repo, store, parserFake)
+	service := NewPipeline(repo, store, parserFake, nil)
 
 	err := service.ProcessPaper(context.Background(), ProcessPaperPayload{PaperID: paperID, JobID: jobID})
 	if err != nil {
@@ -148,7 +148,7 @@ func TestPipelineMarksJobFailedWhenParserFails(t *testing.T) {
 	}
 	store := &fakePipelineStore{pdf: "pdfdata"}
 	parserFake := &fakeParser{err: errors.New("grobid unavailable")}
-	service := NewPipeline(repo, store, parserFake)
+	service := NewPipeline(repo, store, parserFake, nil)
 
 	err := service.ProcessPaper(context.Background(), ProcessPaperPayload{PaperID: paperID, JobID: jobID})
 	if err == nil {
@@ -172,5 +172,30 @@ func TestReadProcessorRejectsMalformedPayload(t *testing.T) {
 	err := processor.HandleReadPaper(context.Background(), asynq.NewTask(TypeReadPaper, []byte("{bad json")))
 	if err == nil {
 		t.Fatal("HandleReadPaper returned nil, want error")
+	}
+}
+
+type fakeReadEnqueuer struct {
+	calls int
+}
+
+func (e *fakeReadEnqueuer) EnqueuePaperRead(ctx context.Context, paperID, jobID uuid.UUID) (string, error) {
+	e.calls++
+	return "task-1", nil
+}
+
+func TestPipelineEnqueuesReadAfterParse(t *testing.T) {
+	repo := &fakePipelineRepo{pdfAsset: storage.Object{Key: "papers/input.pdf"}}
+	store := &fakePipelineStore{pdf: "pdfdata"}
+	parserFake := &fakeParser{parsed: parser.ParsedPaper{Title: "T", RawTEI: "<TEI/>"}}
+	enq := &fakeReadEnqueuer{}
+	service := NewPipeline(repo, store, parserFake, enq)
+
+	err := service.ProcessPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()})
+	if err != nil {
+		t.Fatalf("ProcessPaper error: %v", err)
+	}
+	if enq.calls != 1 {
+		t.Fatalf("read enqueue calls = %d, want 1", enq.calls)
 	}
 }
