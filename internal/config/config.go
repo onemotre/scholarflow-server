@@ -6,16 +6,16 @@ import (
 )
 
 type Config struct {
-	HTTPAddr       string
-	DatabaseURL    string
-	RedisAddr      string
-	MinIOEndpoint  string
-	MinIOAccessKey string
-	MinIOSecretKey string
-	MinIOBucket    string
-	MinIOUseSSL    bool
-	GROBIDURL      string
-	MaxUploadBytes int64
+	HTTPAddr             string
+	DatabaseURL          string
+	RedisAddr            string
+	MinIOEndpoint        string
+	MinIOAccessKey       string
+	MinIOSecretKey       string
+	MinIOBucket          string
+	MinIOUseSSL          bool
+	GROBIDURL            string
+	MaxUploadBytes       int64
 	OpenAIBaseURL        string
 	OpenAIAPIKey         string
 	OpenAIModel          string
@@ -25,16 +25,16 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		HTTPAddr:       envString("HTTP_ADDR", ":8080"),
-		DatabaseURL:    envString("DATABASE_URL", "postgres://scholarflow:scholarflow@localhost:5432/scholarflow?sslmode=disable"),
-		RedisAddr:      envString("REDIS_ADDR", "localhost:6379"),
-		MinIOEndpoint:  envString("MINIO_ENDPOINT", "localhost:9000"),
-		MinIOAccessKey: envString("MINIO_ACCESS_KEY", "scholarflow"),
-		MinIOSecretKey: envString("MINIO_SECRET_KEY", "scholarflow-secret"),
-		MinIOBucket:    envString("MINIO_BUCKET", "scholarflow"),
-		MinIOUseSSL:    envBool("MINIO_USE_SSL", false),
-		GROBIDURL:      envString("GROBID_URL", "http://localhost:8070"),
-		MaxUploadBytes: envInt64("MAX_UPLOAD_BYTES", 50*1024*1024),
+		HTTPAddr:             envString("HTTP_ADDR", ":8080"),
+		DatabaseURL:          envString("DATABASE_URL", "postgres://scholarflow:scholarflow@localhost:5432/scholarflow?sslmode=disable"),
+		RedisAddr:            envString("REDIS_ADDR", "localhost:6379"),
+		MinIOEndpoint:        envString("MINIO_ENDPOINT", "localhost:9000"),
+		MinIOAccessKey:       envString("MINIO_ACCESS_KEY", "scholarflow"),
+		MinIOSecretKey:       envString("MINIO_SECRET_KEY", "scholarflow-secret"),
+		MinIOBucket:          envString("MINIO_BUCKET", "scholarflow"),
+		MinIOUseSSL:          envBool("MINIO_USE_SSL", false),
+		GROBIDURL:            envString("GROBID_URL", "http://localhost:8070"),
+		MaxUploadBytes:       envInt64("MAX_UPLOAD_BYTES", 50*1024*1024),
 		OpenAIBaseURL:        envString("OPENAI_BASE_URL", ""),
 		OpenAIAPIKey:         envString("OPENAI_API_KEY", ""),
 		OpenAIModel:          envString("OPENAI_MODEL", "gpt-4o-mini"),

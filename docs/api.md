@@ -80,3 +80,15 @@ The `paper:process` worker task currently runs the parse-only pipeline:
 6. Marks the job `parsed`.
 
 If parsing or persistence fails, the job is marked `failed` and the worker returns the error to asynq for retry handling.
+
+## Reader Pipeline
+
+When `OPENAI_BASE_URL` and `OPENAI_API_KEY` are set, a successful parse enqueues a `paper:read` task:
+
+1. Marks the job `reading`.
+2. Loads the parsed title, abstract, and sections.
+3. Calls the OpenAI-compatible Chat Completions API for a JSON paper card (no `limitations` field; evidence cites sections by their order label).
+4. Persists the card (`paper_cards`) and evidence (`paper_evidence`), mapping section labels to `paper_sections.id`.
+5. Marks the job `completed`.
+
+If the reader is not configured, the job stops at `parsed`. The latest card is returned in the `card` field of `GET /v1/papers/{id}`.

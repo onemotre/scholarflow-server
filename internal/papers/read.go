@@ -28,19 +28,19 @@ type JobStatus struct {
 }
 
 type PaperDetail struct {
-	PaperID          uuid.UUID      `json:"paper_id"`
-	SourceType       string         `json:"source_type"`
-	Status           string         `json:"status"`
-	Title            *string        `json:"title,omitempty"`
-	Abstract         *string        `json:"abstract,omitempty"`
-	DOI              *string        `json:"doi,omitempty"`
-	PublicationYear  *int32         `json:"publication_year,omitempty"`
-	UploadedFilename string         `json:"uploaded_filename"`
-	CreatedAt        *time.Time     `json:"created_at,omitempty"`
-	UpdatedAt        *time.Time     `json:"updated_at,omitempty"`
-	Authors          []AuthorDTO    `json:"authors"`
-	Sections         []SectionDTO   `json:"sections"`
-	References       []ReferenceDTO `json:"references"`
+	PaperID          uuid.UUID       `json:"paper_id"`
+	SourceType       string          `json:"source_type"`
+	Status           string          `json:"status"`
+	Title            *string         `json:"title,omitempty"`
+	Abstract         *string         `json:"abstract,omitempty"`
+	DOI              *string         `json:"doi,omitempty"`
+	PublicationYear  *int32          `json:"publication_year,omitempty"`
+	UploadedFilename string          `json:"uploaded_filename"`
+	CreatedAt        *time.Time      `json:"created_at,omitempty"`
+	UpdatedAt        *time.Time      `json:"updated_at,omitempty"`
+	Authors          []AuthorDTO     `json:"authors"`
+	Sections         []SectionDTO    `json:"sections"`
+	References       []ReferenceDTO  `json:"references"`
 	Card             json.RawMessage `json:"card,omitempty"`
 }
 
