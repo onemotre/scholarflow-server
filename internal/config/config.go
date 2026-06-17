@@ -16,6 +16,11 @@ type Config struct {
 	MinIOUseSSL    bool
 	GROBIDURL      string
 	MaxUploadBytes int64
+	OpenAIBaseURL        string
+	OpenAIAPIKey         string
+	OpenAIModel          string
+	OpenAIMaxInputChars  int
+	OpenAITimeoutSeconds int
 }
 
 func Load() Config {
@@ -30,6 +35,11 @@ func Load() Config {
 		MinIOUseSSL:    envBool("MINIO_USE_SSL", false),
 		GROBIDURL:      envString("GROBID_URL", "http://localhost:8070"),
 		MaxUploadBytes: envInt64("MAX_UPLOAD_BYTES", 50*1024*1024),
+		OpenAIBaseURL:        envString("OPENAI_BASE_URL", ""),
+		OpenAIAPIKey:         envString("OPENAI_API_KEY", ""),
+		OpenAIModel:          envString("OPENAI_MODEL", "gpt-4o-mini"),
+		OpenAIMaxInputChars:  int(envInt64("OPENAI_MAX_INPUT_CHARS", 48000)),
+		OpenAITimeoutSeconds: int(envInt64("OPENAI_TIMEOUT_SECONDS", 120)),
 	}
 }
 

@@ -31,3 +31,22 @@ func TestLoadEnvironment(t *testing.T) {
 		t.Fatal("MinIOUseSSL = false, want true")
 	}
 }
+
+func TestLoadOpenAIDefaults(t *testing.T) {
+	for _, k := range []string{"OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_MAX_INPUT_CHARS", "OPENAI_TIMEOUT_SECONDS"} {
+		t.Setenv(k, "")
+	}
+	cfg := Load()
+	if cfg.OpenAIBaseURL != "" || cfg.OpenAIAPIKey != "" {
+		t.Fatalf("base url/key should default blank, got %q/%q", cfg.OpenAIBaseURL, cfg.OpenAIAPIKey)
+	}
+	if cfg.OpenAIModel != "gpt-4o-mini" {
+		t.Fatalf("model default = %q", cfg.OpenAIModel)
+	}
+	if cfg.OpenAIMaxInputChars != 48000 {
+		t.Fatalf("max input chars = %d", cfg.OpenAIMaxInputChars)
+	}
+	if cfg.OpenAITimeoutSeconds != 120 {
+		t.Fatalf("timeout = %d", cfg.OpenAITimeoutSeconds)
+	}
+}
