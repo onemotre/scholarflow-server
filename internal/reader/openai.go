@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,7 +69,7 @@ func (r *OpenAIReader) ReadPaper(ctx context.Context, input Context) (PaperCard,
 		if err == nil {
 			return card, nil
 		}
-		if strings.Contains(err.Error(), "limitations") {
+		if errors.Is(err, ErrDisallowedKey) {
 			return PaperCard{}, err
 		}
 		lastErr = err

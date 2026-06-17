@@ -3,9 +3,10 @@ package reader
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -58,12 +59,21 @@ func TestOpenAIReaderParsesCard(t *testing.T) {
 
 func TestOpenAIReaderRejectsLimitations(t *testing.T) {
 	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl","limitations":"nope"}`
-	srv := newCardServer(t, card)
+	var calls int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		resp := map[string]any{"choices": []map[string]any{{"message": map[string]any{"content": card}}}}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
 	defer srv.Close()
 
 	_, err := newReader(srv.URL).ReadPaper(context.Background(), sampleContext())
-	if err == nil || !strings.Contains(err.Error(), "limitations") {
-		t.Fatalf("want limitations error, got %v", err)
+	if !errors.Is(err, ErrDisallowedKey) {
+		t.Fatalf("want ErrDisallowedKey, got %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("server calls = %d, want 1 (limitations must not be retried)", got)
 	}
 }
 

@@ -2,8 +2,13 @@ package reader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
+
+// ErrDisallowedKey is returned when a card contains a field that is not permitted
+// by the schema (e.g. "limitations").
+var ErrDisallowedKey = errors.New("limitations field is not allowed")
 
 type Evidence struct {
 	ClaimKey     string  `json:"claim_key"`
@@ -55,7 +60,7 @@ func (c PaperCard) Validate() error {
 
 func ValidateRawKeys(raw map[string]any) error {
 	if _, ok := raw["limitations"]; ok {
-		return fmt.Errorf("limitations field is not allowed")
+		return ErrDisallowedKey
 	}
 	return nil
 }
