@@ -8,6 +8,7 @@ import (
 
 type Dependencies struct {
 	UploadHandler *UploadHandler
+	ReadHandler   *ReadHandler
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -18,6 +19,10 @@ func NewRouter(deps Dependencies) http.Handler {
 	})
 	if deps.UploadHandler != nil {
 		r.Post("/v1/uploads/papers", deps.UploadHandler.UploadPaper)
+	}
+	if deps.ReadHandler != nil {
+		r.Get("/v1/jobs/{id}", deps.ReadHandler.GetJob)
+		r.Get("/v1/papers/{id}", deps.ReadHandler.GetPaper)
 	}
 	return r
 }

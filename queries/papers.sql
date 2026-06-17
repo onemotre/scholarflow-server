@@ -76,3 +76,12 @@ DELETE FROM paper_references WHERE paper_id = $1;
 INSERT INTO paper_references (paper_id, reference_order, title, authors, venue, year, doi, raw_text)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
+
+-- name: ListPaperAuthors :many
+SELECT * FROM paper_authors WHERE paper_id = $1 ORDER BY author_order;
+
+-- name: ListPaperSections :many
+SELECT * FROM paper_sections WHERE paper_id = $1 ORDER BY section_order;
+
+-- name: ListPaperReferences :many
+SELECT * FROM paper_references WHERE paper_id = $1 ORDER BY reference_order;

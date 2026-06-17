@@ -36,13 +36,15 @@ func main() {
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.RedisAddr})
 	defer asynqClient.Close()
 
-	repo := papers.NewSQLRepository(dbpkg.New(pool))
+	queries := dbpkg.New(pool)
+	repo := papers.NewSQLRepository(queries)
 	enqueuer := jobs.NewEnqueuer(asynqClient)
 	paperService := papers.NewService(repo, store, enqueuer)
 	uploadHandler := httpapi.NewUploadHandler(paperService, cfg.MaxUploadBytes)
+	readHandler := httpapi.NewReadHandler(papers.NewSQLReadRepository(queries))
 
 	log.Printf("starting api on %s", cfg.HTTPAddr)
-	if err := http.ListenAndServe(cfg.HTTPAddr, httpapi.NewRouter(httpapi.Dependencies{UploadHandler: uploadHandler})); err != nil {
+	if err := http.ListenAndServe(cfg.HTTPAddr, httpapi.NewRouter(httpapi.Dependencies{UploadHandler: uploadHandler, ReadHandler: readHandler})); err != nil {
 		log.Fatal(err)
 	}
 }

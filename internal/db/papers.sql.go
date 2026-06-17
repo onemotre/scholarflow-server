@@ -324,6 +324,104 @@ func (q *Queries) GetProcessingJob(ctx context.Context, id uuid.UUID) (PaperProc
 	return i, err
 }
 
+const listPaperAuthors = `-- name: ListPaperAuthors :many
+SELECT id, paper_id, author_order, display_name, orcid, openalex_author_id FROM paper_authors WHERE paper_id = $1 ORDER BY author_order
+`
+
+func (q *Queries) ListPaperAuthors(ctx context.Context, paperID uuid.UUID) ([]PaperAuthor, error) {
+	rows, err := q.db.Query(ctx, listPaperAuthors, paperID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaperAuthor
+	for rows.Next() {
+		var i PaperAuthor
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaperID,
+			&i.AuthorOrder,
+			&i.DisplayName,
+			&i.Orcid,
+			&i.OpenalexAuthorID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPaperReferences = `-- name: ListPaperReferences :many
+SELECT id, paper_id, reference_order, title, authors, venue, year, doi, raw_text FROM paper_references WHERE paper_id = $1 ORDER BY reference_order
+`
+
+func (q *Queries) ListPaperReferences(ctx context.Context, paperID uuid.UUID) ([]PaperReference, error) {
+	rows, err := q.db.Query(ctx, listPaperReferences, paperID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaperReference
+	for rows.Next() {
+		var i PaperReference
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaperID,
+			&i.ReferenceOrder,
+			&i.Title,
+			&i.Authors,
+			&i.Venue,
+			&i.Year,
+			&i.Doi,
+			&i.RawText,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPaperSections = `-- name: ListPaperSections :many
+SELECT id, paper_id, section_order, heading, text, page_start, page_end, grobid_path FROM paper_sections WHERE paper_id = $1 ORDER BY section_order
+`
+
+func (q *Queries) ListPaperSections(ctx context.Context, paperID uuid.UUID) ([]PaperSection, error) {
+	rows, err := q.db.Query(ctx, listPaperSections, paperID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaperSection
+	for rows.Next() {
+		var i PaperSection
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaperID,
+			&i.SectionOrder,
+			&i.Heading,
+			&i.Text,
+			&i.PageStart,
+			&i.PageEnd,
+			&i.GrobidPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setProcessingJobTaskID = `-- name: SetProcessingJobTaskID :one
 UPDATE paper_processing_jobs
 SET task_id = $2,

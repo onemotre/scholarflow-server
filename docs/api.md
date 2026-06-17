@@ -27,6 +27,47 @@ Expected:
 ok
 ```
 
+## Read Endpoints
+
+### `GET /v1/jobs/{id}`
+
+Returns processing-job status. `404` if the job does not exist, `400` for a malformed UUID.
+
+```json
+{
+  "job_id": "857a57d9-...",
+  "paper_id": "bca2c01d-...",
+  "status": "parsed",
+  "attempt_count": 0,
+  "error_message": null,
+  "created_at": "2026-06-17T22:18:22+08:00",
+  "updated_at": "2026-06-17T22:18:40+08:00",
+  "completed_at": null
+}
+```
+
+### `GET /v1/papers/{id}`
+
+Returns parsed paper metadata plus authors, sections, and references. `404` if the paper does not exist, `400` for a malformed UUID.
+
+```json
+{
+  "paper_id": "bca2c01d-...",
+  "source_type": "local_pdf",
+  "status": "parsed",
+  "title": "…",
+  "abstract": "…",
+  "doi": null,
+  "publication_year": null,
+  "uploaded_filename": "paper.pdf",
+  "authors": [{"order": 1, "display_name": "…", "orcid": null}],
+  "sections": [{"order": 1, "heading": "Introduction", "text": "…"}],
+  "references": []
+}
+```
+
+`doi`, `publication_year`, and `references` are populated only insofar as the parser extracts them from the PDF; the current GROBID adapter extracts title/abstract/authors/sections, so these may be empty for preprints.
+
 ## Worker Parse Pipeline
 
 The `paper:process` worker task currently runs the parse-only pipeline:
