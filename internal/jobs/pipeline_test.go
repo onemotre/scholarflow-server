@@ -166,3 +166,11 @@ func TestProcessorRejectsMalformedPayload(t *testing.T) {
 		t.Fatal("HandleProcessPaper returned nil, want error")
 	}
 }
+
+func TestReadProcessorRejectsMalformedPayload(t *testing.T) {
+	processor := NewReadProcessor(nil)
+	err := processor.HandleReadPaper(context.Background(), asynq.NewTask(TypeReadPaper, []byte("{bad json")))
+	if err == nil {
+		t.Fatal("HandleReadPaper returned nil, want error")
+	}
+}
