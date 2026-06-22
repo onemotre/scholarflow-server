@@ -41,6 +41,7 @@ type PaperDetail struct {
 	Authors          []AuthorDTO     `json:"authors"`
 	Sections         []SectionDTO    `json:"sections"`
 	References       []ReferenceDTO  `json:"references"`
+	Figures          []FigureDTO     `json:"figures"`
 	Card             json.RawMessage `json:"card,omitempty"`
 }
 
@@ -66,6 +67,14 @@ type ReferenceDTO struct {
 	Year    *int32   `json:"year,omitempty"`
 	DOI     *string  `json:"doi,omitempty"`
 	RawText *string  `json:"raw_text,omitempty"`
+}
+
+type FigureDTO struct {
+	Label   string `json:"label"`
+	Kind    string `json:"kind"`
+	Caption string `json:"caption"`
+	Order   int32  `json:"order"`
+	Page    *int32 `json:"page,omitempty"`
 }
 
 type SQLReadRepository struct {
@@ -161,6 +170,20 @@ func (r *SQLReadRepository) GetPaperDetail(ctx context.Context, paperID uuid.UUI
 			Year:    ref.Year,
 			DOI:     ref.Doi,
 			RawText: ref.RawText,
+		})
+	}
+	figures, err := r.queries.ListPaperFigures(ctx, paperID)
+	if err != nil {
+		return PaperDetail{}, err
+	}
+	detail.Figures = make([]FigureDTO, 0, len(figures))
+	for _, f := range figures {
+		detail.Figures = append(detail.Figures, FigureDTO{
+			Label:   f.Label,
+			Kind:    f.Kind,
+			Caption: f.Caption,
+			Order:   f.FigureOrder,
+			Page:    f.Page,
 		})
 	}
 	card, err := r.queries.GetLatestPaperCard(ctx, paperID)

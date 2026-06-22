@@ -102,6 +102,7 @@ func TestGetPaperReturnsDetail(t *testing.T) {
 		Authors:  []papers.AuthorDTO{{Order: 1, DisplayName: "Ada"}},
 		Sections: []papers.SectionDTO{{Order: 1, Text: "Body"}},
 		Card:     json.RawMessage(`{"background":"bg"}`),
+		Figures:  []papers.FigureDTO{{Label: "Figure 1", Kind: "figure", Caption: "cap", Order: 1}},
 	}}
 	srv := newTestServer(reader)
 	defer srv.Close()
@@ -129,6 +130,9 @@ func TestGetPaperReturnsDetail(t *testing.T) {
 	}
 	if got.Card == nil || !strings.Contains(string(got.Card), "bg") {
 		t.Fatalf("card = %s", string(got.Card))
+	}
+	if len(got.Figures) != 1 || got.Figures[0].Label != "Figure 1" {
+		t.Fatalf("figures = %#v", got.Figures)
 	}
 }
 
