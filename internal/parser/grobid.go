@@ -146,7 +146,15 @@ type teiRefAnalytic struct {
 }
 
 type teiBody struct {
-	Divs []teiDiv `xml:"div"`
+	Divs    []teiDiv    `xml:"div"`
+	Figures []teiFigure `xml:"figure"`
+}
+
+type teiFigure struct {
+	Type   string `xml:"type,attr"`
+	Coords string `xml:"coords,attr"`
+	Head   string `xml:"head"`
+	Desc   string `xml:"figDesc"`
 }
 
 type teiDiv struct {
@@ -208,6 +216,25 @@ func parseTEI(raw []byte) (ParsedPaper, error) {
 			DOI:     doiFromIdnos(ref.Idnos),
 		})
 	}
+	for i, fig := range doc.Text.Body.Figures {
+		kind := "figure"
+		fallback := "Figure"
+		if strings.EqualFold(strings.TrimSpace(fig.Type), "table") {
+			kind = "table"
+			fallback = "Table"
+		}
+		label := strings.TrimSpace(fig.Head)
+		if label == "" {
+			label = fmt.Sprintf("%s %d", fallback, i+1)
+		}
+		parsed.Figures = append(parsed.Figures, Figure{
+			Order:   int32(i + 1),
+			Kind:    kind,
+			Label:   label,
+			Caption: strings.TrimSpace(fig.Desc),
+			Page:    parsePage(fig.Coords),
+		})
+	}
 	return parsed, nil
 }
 
@@ -241,4 +268,21 @@ func authorNames(authors []teiAuthor) []string {
 		}
 	}
 	return names
+}
+
+func parsePage(coords string) *int32 {
+	coords = strings.TrimSpace(coords)
+	if coords == "" {
+		return nil
+	}
+	first := coords
+	if idx := strings.IndexByte(coords, ','); idx >= 0 {
+		first = coords[:idx]
+	}
+	page, err := strconv.Atoi(strings.TrimSpace(first))
+	if err != nil {
+		return nil
+	}
+	value := int32(page)
+	return &value
 }

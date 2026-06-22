@@ -89,3 +89,32 @@ func TestParseTEIExtractsDOIYearReferences(t *testing.T) {
 		t.Fatalf("Reference authors = %#v", r.Authors)
 	}
 }
+
+func TestParseTEIExtractsFigures(t *testing.T) {
+	tei := `<TEI><text><body>
+	  <div><head>Intro</head><p>x</p></div>
+	  <figure coords="3,10.0,20.0,30.0,40.0"><head>Figure 1</head><figDesc>A plot of results.</figDesc></figure>
+	  <figure type="table"><figDesc>Table contents.</figDesc></figure>
+	</body></text></TEI>`
+	parsed, err := parseTEI([]byte(tei))
+	if err != nil {
+		t.Fatalf("parseTEI error: %v", err)
+	}
+	if len(parsed.Figures) != 2 {
+		t.Fatalf("Figures = %#v", parsed.Figures)
+	}
+	f0 := parsed.Figures[0]
+	if f0.Kind != "figure" || f0.Label != "Figure 1" || f0.Caption != "A plot of results." {
+		t.Fatalf("Figure[0] = %#v", f0)
+	}
+	if f0.Page == nil || *f0.Page != 3 {
+		t.Fatalf("Figure[0].Page = %v", f0.Page)
+	}
+	f1 := parsed.Figures[1]
+	if f1.Kind != "table" || f1.Label != "Table 2" || f1.Caption != "Table contents." {
+		t.Fatalf("Figure[1] = %#v", f1)
+	}
+	if f1.Page != nil {
+		t.Fatalf("Figure[1].Page = %v, want nil", f1.Page)
+	}
+}

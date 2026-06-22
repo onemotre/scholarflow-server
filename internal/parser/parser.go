@@ -14,6 +14,7 @@ type ParsedPaper struct {
 	Affiliations []Affiliation
 	Sections     []Section
 	References   []Reference
+	Figures      []Figure
 	RawTEI       string
 }
 
@@ -47,6 +48,14 @@ type Reference struct {
 	Year    int32
 	DOI     string
 	RawText string
+}
+
+type Figure struct {
+	Order   int32
+	Kind    string
+	Label   string
+	Caption string
+	Page    *int32
 }
 
 type Parser interface {
