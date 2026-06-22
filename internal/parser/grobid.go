@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -84,6 +85,27 @@ type teiSourceDesc struct {
 
 type teiBiblStruct struct {
 	Analytic teiAnalytic `xml:"analytic"`
+	Monogr   teiMonogr   `xml:"monogr"`
+	Idnos    []teiIdno   `xml:"idno"`
+}
+
+type teiMonogr struct {
+	Title   string      `xml:"title"`
+	Authors []teiAuthor `xml:"author"`
+	Imprint teiImprint  `xml:"imprint"`
+}
+
+type teiImprint struct {
+	Date teiDate `xml:"date"`
+}
+
+type teiDate struct {
+	When string `xml:"when,attr"`
+}
+
+type teiIdno struct {
+	Type  string `xml:"type,attr"`
+	Value string `xml:",chardata"`
 }
 
 type teiAnalytic struct {
@@ -105,6 +127,22 @@ type teiProfileDesc struct {
 
 type teiText struct {
 	Body teiBody `xml:"body"`
+	Back teiBack `xml:"back"`
+}
+
+type teiBack struct {
+	Refs []teiRefBibl `xml:"div>listBibl>biblStruct"`
+}
+
+type teiRefBibl struct {
+	Analytic teiRefAnalytic `xml:"analytic"`
+	Monogr   teiMonogr      `xml:"monogr"`
+	Idnos    []teiIdno      `xml:"idno"`
+}
+
+type teiRefAnalytic struct {
+	Title   string      `xml:"title"`
+	Authors []teiAuthor `xml:"author"`
 }
 
 type teiBody struct {
@@ -148,5 +186,59 @@ func parseTEI(raw []byte) (ParsedPaper, error) {
 			Text:    text,
 		})
 	}
+	bibl := doc.Header.FileDesc.SourceDesc.Bibl
+	parsed.DOI = doiFromIdnos(bibl.Idnos)
+	parsed.Year = parseYear(bibl.Monogr.Imprint.Date.When)
+	for i, ref := range doc.Text.Back.Refs {
+		title := strings.TrimSpace(ref.Analytic.Title)
+		venue := strings.TrimSpace(ref.Monogr.Title)
+		if title == "" {
+			title, venue = venue, ""
+		}
+		authors := authorNames(ref.Analytic.Authors)
+		if len(authors) == 0 {
+			authors = authorNames(ref.Monogr.Authors)
+		}
+		parsed.References = append(parsed.References, Reference{
+			Order:   int32(i + 1),
+			Title:   title,
+			Authors: authors,
+			Venue:   venue,
+			Year:    parseYear(ref.Monogr.Imprint.Date.When),
+			DOI:     doiFromIdnos(ref.Idnos),
+		})
+	}
 	return parsed, nil
+}
+
+func doiFromIdnos(idnos []teiIdno) string {
+	for _, id := range idnos {
+		if strings.EqualFold(strings.TrimSpace(id.Type), "DOI") {
+			return strings.TrimSpace(id.Value)
+		}
+	}
+	return ""
+}
+
+func parseYear(when string) int32 {
+	when = strings.TrimSpace(when)
+	if len(when) < 4 {
+		return 0
+	}
+	year, err := strconv.Atoi(when[:4])
+	if err != nil {
+		return 0
+	}
+	return int32(year)
+}
+
+func authorNames(authors []teiAuthor) []string {
+	var names []string
+	for _, a := range authors {
+		name := strings.TrimSpace(a.PersName.Forename + " " + a.PersName.Surname)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
