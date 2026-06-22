@@ -104,6 +104,9 @@ func TestParseTEIExtractsFigures(t *testing.T) {
 		t.Fatalf("Figures = %#v", parsed.Figures)
 	}
 	f0 := parsed.Figures[0]
+	if f0.Order != 1 {
+		t.Fatalf("Figure[0].Order = %d, want 1", f0.Order)
+	}
 	if f0.Kind != "figure" || f0.Label != "Figure 1" || f0.Caption != "A plot of results." {
 		t.Fatalf("Figure[0] = %#v", f0)
 	}
@@ -111,6 +114,9 @@ func TestParseTEIExtractsFigures(t *testing.T) {
 		t.Fatalf("Figure[0].Page = %v", f0.Page)
 	}
 	f1 := parsed.Figures[1]
+	if f1.Order != 2 {
+		t.Fatalf("Figure[1].Order = %d, want 2", f1.Order)
+	}
 	if f1.Kind != "table" || f1.Label != "Table 2" || f1.Caption != "Table contents." {
 		t.Fatalf("Figure[1] = %#v", f1)
 	}

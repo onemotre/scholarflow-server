@@ -280,7 +280,7 @@ func parsePage(coords string) *int32 {
 		first = coords[:idx]
 	}
 	page, err := strconv.Atoi(strings.TrimSpace(first))
-	if err != nil {
+	if err != nil || page <= 0 {
 		return nil
 	}
 	value := int32(page)

@@ -24,9 +24,11 @@ func buildUserPrompt(input Context, maxInputChars int) string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("Sections:\n")
-	for _, s := range input.Sections {
-		fmt.Fprintf(&b, "[%s] %s\n%s\n\n", s.Label, s.Heading, s.Text)
+	if len(input.Sections) > 0 {
+		b.WriteString("Sections:\n")
+		for _, s := range input.Sections {
+			fmt.Fprintf(&b, "[%s] %s\n%s\n\n", s.Label, s.Heading, s.Text)
+		}
 	}
 	out := b.String()
 	if maxInputChars > 0 && len(out) > maxInputChars {
