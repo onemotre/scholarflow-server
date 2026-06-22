@@ -68,6 +68,8 @@ Returns parsed paper metadata plus authors, sections, and references. `404` if t
 
 `doi`, `publication_year`, and `references` are populated only insofar as the parser extracts them from the PDF; the current GROBID adapter extracts title/abstract/authors/sections, so these may be empty for preprints.
 
+The response also includes a `figures` array (`label`, `kind` = `figure`|`table`, `caption`, `order`, `page`) extracted from the document. `doi`, `publication_year`, and `references` are populated when GROBID finds them in the PDF (preprints often have none).
+
 ## Worker Parse Pipeline
 
 The `paper:process` worker task currently runs the parse-only pipeline:
