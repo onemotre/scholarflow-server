@@ -19,10 +19,17 @@ type ReadSection struct {
 	Text    string
 }
 
+type ReadFigure struct {
+	Label   string
+	Kind    string
+	Caption string
+}
+
 type ReadContext struct {
 	Title    string
 	Abstract string
 	Sections []ReadSection
+	Figures  []ReadFigure
 }
 
 type ReadRepository interface {
@@ -73,6 +80,9 @@ func (p *ReadPipeline) read(ctx context.Context, payload ProcessPaperPayload) er
 		}
 		sectionIDByLabel[label] = s.ID
 		input.Sections = append(input.Sections, reader.Section{Label: label, Heading: s.Heading, Text: s.Text})
+	}
+	for _, f := range rc.Figures {
+		input.Figures = append(input.Figures, reader.Figure{Label: f.Label, Kind: f.Kind, Caption: f.Caption})
 	}
 	card, err := p.reader.ReadPaper(ctx, input)
 	if err != nil {

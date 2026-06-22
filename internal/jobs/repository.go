@@ -187,6 +187,13 @@ func (r *SQLRepository) GetReadContext(ctx context.Context, paperID uuid.UUID) (
 			Text:    s.Text,
 		})
 	}
+	figures, err := r.queries.ListPaperFigures(ctx, paperID)
+	if err != nil {
+		return ReadContext{}, fmt.Errorf("list figures: %w", err)
+	}
+	for _, f := range figures {
+		rc.Figures = append(rc.Figures, ReadFigure{Label: f.Label, Kind: f.Kind, Caption: f.Caption})
+	}
 	return rc, nil
 }
 

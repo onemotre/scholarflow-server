@@ -54,6 +54,7 @@ func TestReadPipelineCompletes(t *testing.T) {
 		Title:    "T",
 		Abstract: "A",
 		Sections: []ReadSection{{ID: sectionID, Label: "1", Heading: "Intro", Text: "Body"}},
+		Figures:  []ReadFigure{{Label: "Figure 1", Kind: "figure", Caption: "cap"}},
 	}}
 	rdr := &fakeReader{card: reader.PaperCard{Background: "bg", Problem: "p", Method: "m", Implementation: "impl"}}
 	pipe := NewReadPipeline(repo, rdr, "gpt-4o-mini")
@@ -73,6 +74,9 @@ func TestReadPipelineCompletes(t *testing.T) {
 	}
 	if rdr.got.Sections[0].Label != "1" {
 		t.Fatalf("reader did not receive labeled section: %#v", rdr.got.Sections)
+	}
+	if len(rdr.got.Figures) != 1 || rdr.got.Figures[0].Caption != "cap" {
+		t.Fatalf("reader did not receive figures: %#v", rdr.got.Figures)
 	}
 }
 
