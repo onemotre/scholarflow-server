@@ -128,6 +128,23 @@ func (r *SQLRepository) SaveParsedPaper(ctx context.Context, paperID uuid.UUID, 
 			return fmt.Errorf("create paper reference: %w", err)
 		}
 	}
+	if err := r.queries.DeletePaperFiguresByPaper(ctx, paperID); err != nil {
+		return fmt.Errorf("delete paper figures: %w", err)
+	}
+	for _, fig := range parsed.Figures {
+		_, err := r.queries.CreatePaperFigure(ctx, db.CreatePaperFigureParams{
+			PaperID:      paperID,
+			Kind:         fig.Kind,
+			Label:        fig.Label,
+			Caption:      fig.Caption,
+			FigureOrder:  fig.Order,
+			Page:         fig.Page,
+			ImageAssetID: pgtype.UUID{},
+		})
+		if err != nil {
+			return fmt.Errorf("create paper figure: %w", err)
+		}
+	}
 	return nil
 }
 
