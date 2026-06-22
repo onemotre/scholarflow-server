@@ -101,3 +101,14 @@ DELETE FROM paper_cards WHERE paper_id = $1;
 
 -- name: GetLatestPaperCard :one
 SELECT * FROM paper_cards WHERE paper_id = $1 ORDER BY created_at DESC LIMIT 1;
+
+-- name: DeletePaperFiguresByPaper :exec
+DELETE FROM paper_figures WHERE paper_id = $1;
+
+-- name: CreatePaperFigure :one
+INSERT INTO paper_figures (paper_id, kind, label, caption, figure_order, page, image_asset_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING *;
+
+-- name: ListPaperFigures :many
+SELECT * FROM paper_figures WHERE paper_id = $1 ORDER BY figure_order;

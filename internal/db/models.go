@@ -77,6 +77,18 @@ type PaperEvidence struct {
 	CreatedAt    pgtype.Timestamptz
 }
 
+type PaperFigure struct {
+	ID           uuid.UUID
+	PaperID      uuid.UUID
+	Kind         string
+	Label        string
+	Caption      string
+	FigureOrder  int32
+	Page         *int32
+	ImageAssetID pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+}
+
 type PaperInstitution struct {
 	ID             uuid.UUID
 	PaperID        uuid.UUID

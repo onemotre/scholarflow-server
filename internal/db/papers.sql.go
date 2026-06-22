@@ -197,6 +197,47 @@ func (q *Queries) CreatePaperEvidence(ctx context.Context, arg CreatePaperEviden
 	return i, err
 }
 
+const createPaperFigure = `-- name: CreatePaperFigure :one
+INSERT INTO paper_figures (paper_id, kind, label, caption, figure_order, page, image_asset_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, paper_id, kind, label, caption, figure_order, page, image_asset_id, created_at
+`
+
+type CreatePaperFigureParams struct {
+	PaperID      uuid.UUID
+	Kind         string
+	Label        string
+	Caption      string
+	FigureOrder  int32
+	Page         *int32
+	ImageAssetID pgtype.UUID
+}
+
+func (q *Queries) CreatePaperFigure(ctx context.Context, arg CreatePaperFigureParams) (PaperFigure, error) {
+	row := q.db.QueryRow(ctx, createPaperFigure,
+		arg.PaperID,
+		arg.Kind,
+		arg.Label,
+		arg.Caption,
+		arg.FigureOrder,
+		arg.Page,
+		arg.ImageAssetID,
+	)
+	var i PaperFigure
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.Kind,
+		&i.Label,
+		&i.Caption,
+		&i.FigureOrder,
+		&i.Page,
+		&i.ImageAssetID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createPaperReference = `-- name: CreatePaperReference :one
 INSERT INTO paper_references (paper_id, reference_order, title, authors, venue, year, doi, raw_text)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -323,6 +364,15 @@ DELETE FROM paper_cards WHERE paper_id = $1
 
 func (q *Queries) DeletePaperCardsByPaper(ctx context.Context, paperID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deletePaperCardsByPaper, paperID)
+	return err
+}
+
+const deletePaperFiguresByPaper = `-- name: DeletePaperFiguresByPaper :exec
+DELETE FROM paper_figures WHERE paper_id = $1
+`
+
+func (q *Queries) DeletePaperFiguresByPaper(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperFiguresByPaper, paperID)
 	return err
 }
 
@@ -454,6 +504,40 @@ func (q *Queries) ListPaperAuthors(ctx context.Context, paperID uuid.UUID) ([]Pa
 			&i.DisplayName,
 			&i.Orcid,
 			&i.OpenalexAuthorID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPaperFigures = `-- name: ListPaperFigures :many
+SELECT id, paper_id, kind, label, caption, figure_order, page, image_asset_id, created_at FROM paper_figures WHERE paper_id = $1 ORDER BY figure_order
+`
+
+func (q *Queries) ListPaperFigures(ctx context.Context, paperID uuid.UUID) ([]PaperFigure, error) {
+	rows, err := q.db.Query(ctx, listPaperFigures, paperID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaperFigure
+	for rows.Next() {
+		var i PaperFigure
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaperID,
+			&i.Kind,
+			&i.Label,
+			&i.Caption,
+			&i.FigureOrder,
+			&i.Page,
+			&i.ImageAssetID,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
