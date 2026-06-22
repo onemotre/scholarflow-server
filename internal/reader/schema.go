@@ -39,12 +39,19 @@ type Context struct {
 	Title    string
 	Abstract string
 	Sections []Section
+	Figures  []Figure
 }
 
 type Section struct {
 	Label   string
 	Heading string
 	Text    string
+}
+
+type Figure struct {
+	Label   string
+	Kind    string
+	Caption string
 }
 
 type Reader interface {

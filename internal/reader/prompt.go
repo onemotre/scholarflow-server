@@ -16,7 +16,15 @@ JSON shape:
 
 func buildUserPrompt(input Context, maxInputChars int) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Title: %s\n\nAbstract: %s\n\nSections:\n", input.Title, input.Abstract)
+	fmt.Fprintf(&b, "Title: %s\n\nAbstract: %s\n\n", input.Title, input.Abstract)
+	if len(input.Figures) > 0 {
+		b.WriteString("Figures and Tables:\n")
+		for _, f := range input.Figures {
+			fmt.Fprintf(&b, "- [%s] %s\n", f.Label, f.Caption)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("Sections:\n")
 	for _, s := range input.Sections {
 		fmt.Fprintf(&b, "[%s] %s\n%s\n\n", s.Label, s.Heading, s.Text)
 	}
