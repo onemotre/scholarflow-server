@@ -94,3 +94,11 @@ When `OPENAI_BASE_URL` and `OPENAI_API_KEY` are set, a successful parse enqueues
 5. Marks the job `completed`.
 
 If the reader is not configured, the job stops at `parsed`. The latest card is returned in the `card` field of `GET /v1/papers/{id}`.
+
+### Reader Configuration
+
+Three optional env vars tune reader behavior (all have defaults; the reader is still disabled until `OPENAI_BASE_URL`/`OPENAI_API_KEY` are set):
+
+- `OPENAI_API_STYLE` (default `chat`): `chat` uses `/chat/completions`; `responses` uses the OpenAI Responses API (`/responses`). Switch to `responses` only if your provider supports it.
+- `OPENAI_RESPONSE_FORMAT` (default `json_schema`): enforce the full paper-card schema via Structured Outputs. Set to `json_object` if your provider rejects JSON-schema requests.
+- `OPENAI_SYSTEM_PROMPT_PATH` (default empty): path to a system-prompt file that overrides the built-in default at runtime (e.g. a mounted file); falls back to the embedded default if unset or unreadable.
