@@ -142,8 +142,53 @@ func TestResponsesStyleHonorsOutputText(t *testing.T) {
 		APIStyle: "responses", ResponseFormat: "json_object",
 		SystemPrompt: "sp", MaxInputChars: 48000, Timeout: 5 * time.Second,
 	})
+	got, err := rd.ReadPaper(context.Background(), sampleContext())
+	if err != nil {
+		t.Fatalf("ReadPaper error: %v", err)
+	}
+	if got.Background != "bg" {
+		t.Fatalf("background = %q (output_text fallback path did not yield the card)", got.Background)
+	}
+}
+
+func TestResponsesJSONSchemaRequestShape(t *testing.T) {
+	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl"}`
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		resp := map[string]any{"output": []map[string]any{
+			{"content": []map[string]any{{"type": "output_text", "text": card}}},
+		}}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	rd := NewOpenAIReader(OpenAIConfig{
+		BaseURL: srv.URL, APIKey: "test-key", Model: "m",
+		APIStyle: "responses", ResponseFormat: "json_schema",
+		SystemPrompt: "sp", MaxInputChars: 48000, Timeout: 5 * time.Second,
+	})
 	if _, err := rd.ReadPaper(context.Background(), sampleContext()); err != nil {
 		t.Fatalf("ReadPaper error: %v", err)
+	}
+	text, ok := gotBody["text"].(map[string]any)
+	if !ok {
+		t.Fatalf("text block missing: %#v", gotBody)
+	}
+	format, ok := text["format"].(map[string]any)
+	if !ok {
+		t.Fatalf("text.format missing: %#v", text)
+	}
+	// Responses style nests the schema flat in text.format (no inner json_schema key).
+	if format["type"] != "json_schema" || format["strict"] != true || format["name"] != "paper_card" {
+		t.Fatalf("text.format = %#v", format)
+	}
+	if _, nested := format["json_schema"]; nested {
+		t.Fatalf("responses format must be flat, got nested json_schema: %#v", format)
+	}
+	if _, hasSchema := format["schema"]; !hasSchema {
+		t.Fatalf("text.format missing schema: %#v", format)
 	}
 }
 

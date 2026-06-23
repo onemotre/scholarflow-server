@@ -189,6 +189,10 @@ func extractResponsesContent(raw []byte) (string, error) {
 	if strings.TrimSpace(parsed.OutputText) != "" {
 		return parsed.OutputText, nil
 	}
+	// Structured Outputs returns a single text part; concatenate without a
+	// separator so that a provider splitting one JSON document across parts
+	// still reconstructs to valid JSON. Stay permissive on part type — some
+	// proxies omit the "output_text" type tag.
 	var b strings.Builder
 	for _, item := range parsed.Output {
 		for _, c := range item.Content {
