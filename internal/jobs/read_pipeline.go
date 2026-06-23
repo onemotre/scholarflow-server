@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -34,6 +35,7 @@ type ReadContext struct {
 
 type ReadRepository interface {
 	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error
+	SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attempt int32) error
 	GetReadContext(ctx context.Context, paperID uuid.UUID) (ReadContext, error)
 	SavePaperCard(ctx context.Context, paperID uuid.UUID, model, schemaVersion string, card reader.PaperCard, sectionIDByLabel map[string]uuid.UUID) error
 }
@@ -48,19 +50,24 @@ func NewReadPipeline(repo ReadRepository, rdr reader.Reader, model string) *Read
 	return &ReadPipeline{repo: repo, reader: rdr, model: model}
 }
 
-func (p *ReadPipeline) ReadPaper(ctx context.Context, payload ProcessPaperPayload) error {
+func (p *ReadPipeline) ReadPaper(ctx context.Context, payload ProcessPaperPayload, attempt int32, isFinalAttempt bool) error {
 	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusReading, nil, 0); err != nil {
 		return fmt.Errorf("mark job reading: %w", err)
 	}
 	err := p.read(ctx, payload)
 	if err != nil {
+		log.Printf("read failed paper=%s job=%s attempt=%d final=%t: %v", payload.PaperID, payload.JobID, attempt, isFinalAttempt, err)
 		message := err.Error()
-		if markErr := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusFailed, &message, 1); markErr != nil {
-			return fmt.Errorf("%w; mark job failed: %v", err, markErr)
+		status := StatusReading
+		if isFinalAttempt {
+			status = StatusFailed
+		}
+		if markErr := p.repo.SetReadJobOutcome(ctx, payload.JobID, status, &message, attempt); markErr != nil {
+			return fmt.Errorf("%w; mark job outcome: %v", err, markErr)
 		}
 		return err
 	}
-	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusCompleted, nil, 0); err != nil {
+	if err := p.repo.SetReadJobOutcome(ctx, payload.JobID, StatusCompleted, nil, attempt); err != nil {
 		return fmt.Errorf("mark job completed: %w", err)
 	}
 	return nil

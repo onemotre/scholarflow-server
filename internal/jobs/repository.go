@@ -33,6 +33,16 @@ func (r *SQLRepository) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, st
 	return err
 }
 
+func (r *SQLRepository) SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attempt int32) error {
+	_, err := r.queries.SetJobStatusAndAttempt(ctx, db.SetJobStatusAndAttemptParams{
+		ID:           jobID,
+		Status:       status,
+		ErrorMessage: errorMessage,
+		AttemptCount: attempt,
+	})
+	return err
+}
+
 func (r *SQLRepository) GetPaperPDFAsset(ctx context.Context, paperID uuid.UUID) (storage.Object, error) {
 	asset, err := r.queries.GetPaperAssetByType(ctx, db.GetPaperAssetByTypeParams{
 		PaperID:   paperID,

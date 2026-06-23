@@ -11,16 +11,33 @@ import (
 	"scholarflow_server/internal/reader"
 )
 
+type recordedOutcome struct {
+	status  string
+	errMsg  string
+	attempt int32
+}
+
 type fakeReadRepo struct {
 	statuses []string
 	rc       ReadContext
 	saved    reader.PaperCard
 	savedMap map[string]uuid.UUID
 	failSave error
+	outcomes []recordedOutcome
 }
 
 func (r *fakeReadRepo) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error {
 	r.statuses = append(r.statuses, status)
+	return nil
+}
+
+func (r *fakeReadRepo) SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attempt int32) error {
+	msg := ""
+	if errorMessage != nil {
+		msg = *errorMessage
+	}
+	r.statuses = append(r.statuses, status)
+	r.outcomes = append(r.outcomes, recordedOutcome{status: status, errMsg: msg, attempt: attempt})
 	return nil
 }
 
@@ -59,7 +76,7 @@ func TestReadPipelineCompletes(t *testing.T) {
 	rdr := &fakeReader{card: reader.PaperCard{Background: "bg", Problem: "p", Method: "m", Implementation: "impl"}}
 	pipe := NewReadPipeline(repo, rdr, "gpt-4o-mini")
 
-	err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()})
+	err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()}, 1, true)
 	if err != nil {
 		t.Fatalf("ReadPaper error: %v", err)
 	}
@@ -80,16 +97,38 @@ func TestReadPipelineCompletes(t *testing.T) {
 	}
 }
 
-func TestReadPipelineFailsOnReaderError(t *testing.T) {
+func TestReadPipelineNonFinalFailureStaysReading(t *testing.T) {
 	repo := &fakeReadRepo{rc: ReadContext{Title: "T"}}
 	rdr := &fakeReader{err: errors.New("llm down")}
 	pipe := NewReadPipeline(repo, rdr, "gpt-4o-mini")
 
-	err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()})
+	err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()}, 1, false)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
-	if got := strings.Join(repo.statuses, ","); got != "reading,failed" {
-		t.Fatalf("statuses = %s", got)
+	last := repo.outcomes[len(repo.outcomes)-1]
+	if last.status != StatusReading {
+		t.Fatalf("non-final failure status = %q, want reading", last.status)
+	}
+	if last.attempt != 1 || last.errMsg == "" {
+		t.Fatalf("outcome = %#v, want attempt 1 with error", last)
+	}
+}
+
+func TestReadPipelineFinalFailureMarksFailed(t *testing.T) {
+	repo := &fakeReadRepo{rc: ReadContext{Title: "T"}}
+	rdr := &fakeReader{err: errors.New("llm down")}
+	pipe := NewReadPipeline(repo, rdr, "gpt-4o-mini")
+
+	err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()}, 4, true)
+	if err == nil {
+		t.Fatal("want error, got nil")
+	}
+	last := repo.outcomes[len(repo.outcomes)-1]
+	if last.status != StatusFailed {
+		t.Fatalf("final failure status = %q, want failed", last.status)
+	}
+	if last.attempt != 4 {
+		t.Fatalf("final attempt = %d, want 4", last.attempt)
 	}
 }
