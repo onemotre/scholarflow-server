@@ -12,22 +12,53 @@ import (
 	"time"
 )
 
-type OpenAIReader struct {
-	baseURL       string
-	apiKey        string
-	model         string
-	maxInputChars int
-	client        *http.Client
+type OpenAIConfig struct {
+	BaseURL        string
+	APIKey         string
+	Model          string
+	APIStyle       string // "chat" | "responses"
+	ResponseFormat string // "json_schema" | "json_object"
+	SystemPrompt   string
+	MaxInputChars  int
+	Timeout        time.Duration
 }
 
-func NewOpenAIReader(baseURL, apiKey, model string, maxInputChars int, timeout time.Duration) *OpenAIReader {
+type OpenAIReader struct {
+	baseURL        string
+	apiKey         string
+	model          string
+	apiStyle       string
+	responseFormat string
+	systemPrompt   string
+	maxInputChars  int
+	client         *http.Client
+}
+
+func NewOpenAIReader(cfg OpenAIConfig) *OpenAIReader {
 	return &OpenAIReader{
-		baseURL:       strings.TrimRight(baseURL, "/"),
-		apiKey:        apiKey,
-		model:         model,
-		maxInputChars: maxInputChars,
-		client:        &http.Client{Timeout: timeout},
+		baseURL:        strings.TrimRight(cfg.BaseURL, "/"),
+		apiKey:         cfg.APIKey,
+		model:          cfg.Model,
+		apiStyle:       normalizeAPIStyle(cfg.APIStyle),
+		responseFormat: normalizeResponseFormat(cfg.ResponseFormat),
+		systemPrompt:   cfg.SystemPrompt,
+		maxInputChars:  cfg.MaxInputChars,
+		client:         &http.Client{Timeout: cfg.Timeout},
 	}
+}
+
+func normalizeAPIStyle(s string) string {
+	if strings.EqualFold(strings.TrimSpace(s), "responses") {
+		return "responses"
+	}
+	return "chat"
+}
+
+func normalizeResponseFormat(s string) string {
+	if strings.EqualFold(strings.TrimSpace(s), "json_object") {
+		return "json_object"
+	}
+	return "json_schema"
 }
 
 type chatMessage struct {
@@ -35,33 +66,11 @@ type chatMessage struct {
 	Content string `json:"content"`
 }
 
-type chatRequest struct {
-	Model          string         `json:"model"`
-	Messages       []chatMessage  `json:"messages"`
-	Temperature    float64        `json:"temperature"`
-	ResponseFormat map[string]any `json:"response_format,omitempty"`
-}
-
-type chatResponse struct {
-	Choices []struct {
-		Message chatMessage `json:"message"`
-	} `json:"choices"`
-}
-
 func (r *OpenAIReader) ReadPaper(ctx context.Context, input Context) (PaperCard, error) {
-	reqBody := chatRequest{
-		Model: r.model,
-		Messages: []chatMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: buildUserPrompt(input, r.maxInputChars)},
-		},
-		Temperature:    0,
-		ResponseFormat: map[string]any{"type": "json_object"},
-	}
-
+	user := buildUserPrompt(input, r.maxInputChars)
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
-		content, err := r.call(ctx, reqBody)
+		content, err := r.call(ctx, r.systemPrompt, user)
 		if err != nil {
 			return PaperCard{}, err
 		}
@@ -77,12 +86,13 @@ func (r *OpenAIReader) ReadPaper(ctx context.Context, input Context) (PaperCard,
 	return PaperCard{}, fmt.Errorf("read paper: %w", lastErr)
 }
 
-func (r *OpenAIReader) call(ctx context.Context, body chatRequest) (string, error) {
+func (r *OpenAIReader) call(ctx context.Context, system, user string) (string, error) {
+	path, body := r.buildRequest(system, user)
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+"/chat/completions", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+path, bytes.NewReader(payload))
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +111,59 @@ func (r *OpenAIReader) call(ctx context.Context, body chatRequest) (string, erro
 	if resp.StatusCode >= 300 {
 		return "", fmt.Errorf("openai returned status %d: %s", resp.StatusCode, string(raw))
 	}
-	var parsed chatResponse
+	if r.apiStyle == "responses" {
+		return extractResponsesContent(raw)
+	}
+	return extractChatContent(raw)
+}
+
+func (r *OpenAIReader) buildRequest(system, user string) (string, any) {
+	messages := []chatMessage{{Role: "system", Content: system}, {Role: "user", Content: user}}
+	if r.apiStyle == "responses" {
+		return "/responses", map[string]any{
+			"model":       r.model,
+			"input":       messages,
+			"temperature": 0,
+			"text":        map[string]any{"format": r.formatSpec()},
+		}
+	}
+	return "/chat/completions", map[string]any{
+		"model":           r.model,
+		"messages":        messages,
+		"temperature":     0,
+		"response_format": r.formatSpec(),
+	}
+}
+
+// formatSpec builds the response-format block for the active style + format.
+func (r *OpenAIReader) formatSpec() map[string]any {
+	if r.responseFormat != "json_schema" {
+		return map[string]any{"type": "json_object"}
+	}
+	if r.apiStyle == "responses" {
+		return map[string]any{
+			"type":   "json_schema",
+			"name":   "paper_card",
+			"strict": true,
+			"schema": cardJSONSchema(),
+		}
+	}
+	return map[string]any{
+		"type": "json_schema",
+		"json_schema": map[string]any{
+			"name":   "paper_card",
+			"strict": true,
+			"schema": cardJSONSchema(),
+		},
+	}
+}
+
+func extractChatContent(raw []byte) (string, error) {
+	var parsed struct {
+		Choices []struct {
+			Message chatMessage `json:"message"`
+		} `json:"choices"`
+	}
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return "", fmt.Errorf("decode openai response: %w", err)
 	}
@@ -109,6 +171,40 @@ func (r *OpenAIReader) call(ctx context.Context, body chatRequest) (string, erro
 		return "", fmt.Errorf("openai response had no choices")
 	}
 	return parsed.Choices[0].Message.Content, nil
+}
+
+func extractResponsesContent(raw []byte) (string, error) {
+	var parsed struct {
+		OutputText string `json:"output_text"`
+		Output     []struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return "", fmt.Errorf("decode openai response: %w", err)
+	}
+	if strings.TrimSpace(parsed.OutputText) != "" {
+		return parsed.OutputText, nil
+	}
+	// Structured Outputs returns a single text part; concatenate without a
+	// separator so that a provider splitting one JSON document across parts
+	// still reconstructs to valid JSON. Stay permissive on part type — some
+	// proxies omit the "output_text" type tag.
+	var b strings.Builder
+	for _, item := range parsed.Output {
+		for _, c := range item.Content {
+			if c.Text != "" {
+				b.WriteString(c.Text)
+			}
+		}
+	}
+	if b.Len() == 0 {
+		return "", fmt.Errorf("openai responses output had no text")
+	}
+	return b.String(), nil
 }
 
 func parseCard(content string) (PaperCard, error) {

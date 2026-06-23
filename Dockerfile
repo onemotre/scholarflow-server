@@ -7,6 +7,9 @@ RUN go build -o /out/server ./cmd/server
 RUN go build -o /out/worker ./cmd/worker
 
 FROM debian:bookworm-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /out/server /app/server
 COPY --from=build /out/worker /app/worker

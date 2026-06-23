@@ -46,10 +46,19 @@ func main() {
 		enqueuer := jobs.NewEnqueuer(client)
 		readEnqueuer = enqueuer
 
-		rdr := reader.NewOpenAIReader(cfg.OpenAIBaseURL, cfg.OpenAIAPIKey, cfg.OpenAIModel, cfg.OpenAIMaxInputChars, time.Duration(cfg.OpenAITimeoutSeconds)*time.Second)
+		rdr := reader.NewOpenAIReader(reader.OpenAIConfig{
+			BaseURL:        cfg.OpenAIBaseURL,
+			APIKey:         cfg.OpenAIAPIKey,
+			Model:          cfg.OpenAIModel,
+			APIStyle:       cfg.OpenAIAPIStyle,
+			ResponseFormat: cfg.OpenAIResponseFormat,
+			SystemPrompt:   reader.LoadSystemPrompt(cfg.OpenAISystemPromptPath),
+			MaxInputChars:  cfg.OpenAIMaxInputChars,
+			Timeout:        time.Duration(cfg.OpenAITimeoutSeconds) * time.Second,
+		})
 		readPipeline := jobs.NewReadPipeline(repo, rdr, cfg.OpenAIModel)
 		jobs.NewReadProcessor(readPipeline).Register(mux)
-		log.Printf("reader enabled model=%s base=%s", cfg.OpenAIModel, cfg.OpenAIBaseURL)
+		log.Printf("reader enabled model=%s base=%s style=%s format=%s", cfg.OpenAIModel, cfg.OpenAIBaseURL, cfg.OpenAIAPIStyle, cfg.OpenAIResponseFormat)
 	} else {
 		log.Printf("reader disabled (OPENAI_BASE_URL / OPENAI_API_KEY not set); jobs stop at parsed")
 	}

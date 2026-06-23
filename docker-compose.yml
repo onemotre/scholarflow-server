@@ -2,7 +2,13 @@ services:
   api:
     build: .
     command: ["/app/server"]
-    env_file: .env.example
+    env_file: .env
+    # Mount the host prompts directory (internal/reader/prompts) into the
+    # container at /app/prompts so OPENAI_SYSTEM_PROMPT_PATH can point at a
+    # host-edited prompt (e.g. /app/prompts/system.md) without rebuilding the
+    # image. The embedded default is used when the path is unset/unreadable.
+    volumes:
+      - ./internal/reader/prompts:/app/prompts:ro
     ports:
       - "8080:8080"
     depends_on:
@@ -14,7 +20,9 @@ services:
   worker:
     build: .
     command: ["/app/worker"]
-    env_file: .env.example
+    env_file: .env
+    volumes:
+      - ./internal/reader/prompts:/app/prompts:ro
     depends_on:
       - postgres
       - redis

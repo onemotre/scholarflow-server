@@ -71,3 +71,42 @@ func ValidateRawKeys(raw map[string]any) error {
 	}
 	return nil
 }
+
+func cardJSONSchema() map[string]any {
+	strArray := func() map[string]any {
+		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+	}
+	evidence := map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"claim_key", "evidence_type", "section_id", "asset_id", "page", "locator", "snippet", "confidence"},
+		"properties": map[string]any{
+			"claim_key":     map[string]any{"type": "string"},
+			"evidence_type": map[string]any{"type": "string"},
+			"section_id":    map[string]any{"type": "string"},
+			"asset_id":      map[string]any{"type": "string"},
+			"page":          map[string]any{"type": []string{"integer", "null"}},
+			"locator":       map[string]any{"type": "string"},
+			"snippet":       map[string]any{"type": "string"},
+			"confidence":    map[string]any{"type": "number"},
+		},
+	}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"background", "problem", "method", "implementation", "benchmarks", "baselines", "results", "code_links", "data_links", "key_figures", "evidence"},
+		"properties": map[string]any{
+			"background":     map[string]any{"type": "string"},
+			"problem":        map[string]any{"type": "string"},
+			"method":         map[string]any{"type": "string"},
+			"implementation": map[string]any{"type": "string"},
+			"benchmarks":     strArray(),
+			"baselines":      strArray(),
+			"results":        strArray(),
+			"code_links":     strArray(),
+			"data_links":     strArray(),
+			"key_figures":    strArray(),
+			"evidence":       map[string]any{"type": "array", "items": evidence},
+		},
+	}
+}

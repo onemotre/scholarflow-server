@@ -1,18 +1,29 @@
 package reader
 
 import (
+	_ "embed"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 )
 
-const systemPrompt = `You are an objective research-paper summarizer. Produce a strict JSON object describing the paper.
-Rules:
-- Output ONLY a JSON object, no prose, no code fences.
-- Never include a "limitations" field.
-- Be factual; do not speculate. Use empty strings or empty arrays when unknown.
-- For each non-trivial claim, add an "evidence" entry whose "section_id" is the SECTION LABEL (the number shown in brackets) that supports it.
-JSON shape:
-{"background":"","problem":"","method":"","implementation":"","benchmarks":[],"baselines":[],"results":[],"code_links":[],"data_links":[],"key_figures":[],"evidence":[{"claim_key":"","evidence_type":"section","section_id":"<label>","snippet":"","confidence":0.0}]}`
+//go:embed prompts/system.md
+var defaultSystemPrompt string
+
+// LoadSystemPrompt returns the contents of the file at path when it is set and
+// readable, otherwise the embedded default. It never fails the reader.
+func LoadSystemPrompt(path string) string {
+	if path == "" {
+		return defaultSystemPrompt
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Printf("reader: cannot read OPENAI_SYSTEM_PROMPT_PATH %q (%v); using embedded default", path, err)
+		return defaultSystemPrompt
+	}
+	return string(data)
+}
 
 func buildUserPrompt(input Context, maxInputChars int) string {
 	var b strings.Builder
