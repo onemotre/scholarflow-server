@@ -8,11 +8,12 @@ import (
 )
 
 type Enqueuer struct {
-	client *asynq.Client
+	client       *asynq.Client
+	readMaxRetry int
 }
 
-func NewEnqueuer(client *asynq.Client) *Enqueuer {
-	return &Enqueuer{client: client}
+func NewEnqueuer(client *asynq.Client, readMaxRetry int) *Enqueuer {
+	return &Enqueuer{client: client, readMaxRetry: readMaxRetry}
 }
 
 func (e *Enqueuer) EnqueuePaperProcessing(ctx context.Context, paperID uuid.UUID, jobID uuid.UUID) (string, error) {
@@ -32,7 +33,7 @@ func (e *Enqueuer) EnqueuePaperRead(ctx context.Context, paperID uuid.UUID, jobI
 	if err != nil {
 		return "", err
 	}
-	info, err := e.client.EnqueueContext(ctx, task)
+	info, err := e.client.EnqueueContext(ctx, task, asynq.MaxRetry(e.readMaxRetry))
 	if err != nil {
 		return "", err
 	}

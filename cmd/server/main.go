@@ -38,7 +38,7 @@ func main() {
 
 	queries := dbpkg.New(pool)
 	repo := papers.NewSQLRepository(queries)
-	enqueuer := jobs.NewEnqueuer(asynqClient)
+	enqueuer := jobs.NewEnqueuer(asynqClient, cfg.ReadMaxRetry)
 	paperService := papers.NewService(repo, store, enqueuer)
 	uploadHandler := httpapi.NewUploadHandler(paperService, cfg.MaxUploadBytes)
 	readHandler := httpapi.NewReadHandler(papers.NewSQLReadRepository(queries))

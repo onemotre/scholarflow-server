@@ -43,7 +43,7 @@ func main() {
 	if readerConfigured {
 		client := asynq.NewClient(redisOpt)
 		defer client.Close()
-		enqueuer := jobs.NewEnqueuer(client)
+		enqueuer := jobs.NewEnqueuer(client, cfg.ReadMaxRetry)
 		readEnqueuer = enqueuer
 
 		rdr := reader.NewOpenAIReader(reader.OpenAIConfig{
