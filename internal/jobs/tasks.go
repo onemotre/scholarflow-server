@@ -9,6 +9,7 @@ import (
 
 const TypeProcessPaper = "paper:process"
 const TypeReadPaper = "paper:read"
+const TypeCleanupJobs = "jobs:cleanup"
 
 type ProcessPaperPayload struct {
 	PaperID uuid.UUID `json:"paper_id"`
@@ -29,4 +30,8 @@ func NewReadPaperTask(paperID uuid.UUID, jobID uuid.UUID) (*asynq.Task, error) {
 		return nil, err
 	}
 	return asynq.NewTask(TypeReadPaper, payload), nil
+}
+
+func NewCleanupJobsTask() (*asynq.Task, error) {
+	return asynq.NewTask(TypeCleanupJobs, nil), nil
 }

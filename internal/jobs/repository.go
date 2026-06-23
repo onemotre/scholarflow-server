@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -255,4 +256,8 @@ func intPointer(value *int) *int32 {
 	}
 	v := int32(*value)
 	return &v
+}
+
+func (r *SQLRepository) DeleteFailedJobsOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	return r.queries.DeleteFailedJobsOlderThan(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }
