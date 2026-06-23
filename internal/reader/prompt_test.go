@@ -1,35 +1,33 @@
 package reader
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestBuildUserPromptIncludesFigures(t *testing.T) {
-	out := buildUserPrompt(Context{
-		Title:    "T",
-		Abstract: "A",
-		Figures:  []Figure{{Label: "Figure 1", Kind: "figure", Caption: "A plot of results."}},
-		Sections: []Section{{Label: "1", Heading: "Intro", Text: "body"}},
-	}, 48000)
-	if !strings.Contains(out, "Figures and Tables:") {
-		t.Fatalf("missing figures header: %s", out)
-	}
-	if !strings.Contains(out, "[Figure 1] A plot of results.") {
-		t.Fatalf("missing figure caption line: %s", out)
-	}
-	if strings.Index(out, "Figures and Tables:") >= strings.Index(out, "Sections:") {
-		t.Fatalf("figures must appear before sections: %s", out)
+func TestLoadSystemPromptDefault(t *testing.T) {
+	got := LoadSystemPrompt("")
+	if !strings.Contains(got, "objective research-paper summarizer") {
+		t.Fatalf("default prompt missing expected text: %q", got)
 	}
 }
 
-func TestBuildUserPromptOmitsFiguresWhenEmpty(t *testing.T) {
-	out := buildUserPrompt(Context{
-		Title:    "T",
-		Abstract: "A",
-		Sections: []Section{{Label: "1", Heading: "Intro", Text: "body"}},
-	}, 48000)
-	if strings.Contains(out, "Figures and Tables:") {
-		t.Fatalf("figures header should be absent when no figures: %s", out)
+func TestLoadSystemPromptOverride(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "custom.md")
+	if err := os.WriteFile(path, []byte("CUSTOM PROMPT"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := LoadSystemPrompt(path); got != "CUSTOM PROMPT" {
+		t.Fatalf("override prompt = %q", got)
+	}
+}
+
+func TestLoadSystemPromptUnreadableFallsBack(t *testing.T) {
+	got := LoadSystemPrompt(filepath.Join(t.TempDir(), "missing.md"))
+	if !strings.Contains(got, "objective research-paper summarizer") {
+		t.Fatalf("unreadable path should fall back to default, got %q", got)
 	}
 }

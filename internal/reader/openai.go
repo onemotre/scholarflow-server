@@ -52,7 +52,7 @@ func (r *OpenAIReader) ReadPaper(ctx context.Context, input Context) (PaperCard,
 	reqBody := chatRequest{
 		Model: r.model,
 		Messages: []chatMessage{
-			{Role: "system", Content: systemPrompt},
+			{Role: "system", Content: defaultSystemPrompt},
 			{Role: "user", Content: buildUserPrompt(input, r.maxInputChars)},
 		},
 		Temperature:    0,
