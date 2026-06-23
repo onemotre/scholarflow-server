@@ -112,3 +112,29 @@ RETURNING *;
 
 -- name: ListPaperFigures :many
 SELECT * FROM paper_figures WHERE paper_id = $1 ORDER BY figure_order;
+
+-- name: SetJobStatusAndAttempt :one
+UPDATE paper_processing_jobs
+SET status = $2,
+    error_message = $3,
+    attempt_count = $4,
+    updated_at = now(),
+    completed_at = CASE WHEN $2 IN ('completed', 'failed') THEN now() ELSE completed_at END
+WHERE id = $1
+RETURNING *;
+
+-- name: ResetFailedJob :execrows
+UPDATE paper_processing_jobs
+SET status = 'queued',
+    attempt_count = 0,
+    error_message = NULL,
+    completed_at = NULL,
+    updated_at = now()
+WHERE id = $1 AND status = 'failed';
+
+-- name: CountPaperSections :one
+SELECT count(*) FROM paper_sections WHERE paper_id = $1;
+
+-- name: DeleteFailedJobsOlderThan :execrows
+DELETE FROM paper_processing_jobs
+WHERE status = 'failed' AND updated_at < $1;
