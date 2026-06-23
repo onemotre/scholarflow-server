@@ -195,6 +195,22 @@ func (r *SQLReadRepository) GetPaperDetail(ctx context.Context, paperID uuid.UUI
 	return detail, nil
 }
 
+func (r *SQLReadRepository) CountPaperSections(ctx context.Context, paperID uuid.UUID) (int64, error) {
+	return r.queries.CountPaperSections(ctx, paperID)
+}
+
+func (r *SQLReadRepository) ResetFailedJob(ctx context.Context, jobID uuid.UUID) (int64, error) {
+	return r.queries.ResetFailedJob(ctx, jobID)
+}
+
+func (r *SQLReadRepository) SetJobTaskID(ctx context.Context, jobID uuid.UUID, taskID string) error {
+	_, err := r.queries.SetProcessingJobTaskID(ctx, db.SetProcessingJobTaskIDParams{
+		ID:     jobID,
+		TaskID: &taskID,
+	})
+	return err
+}
+
 func timestamp(ts pgtype.Timestamptz) *time.Time {
 	if !ts.Valid {
 		return nil

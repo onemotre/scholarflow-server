@@ -66,3 +66,39 @@ func writeJSON(w http.ResponseWriter, v any) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(v)
 }
+
+type JobRetrier interface {
+	RetryJob(ctx context.Context, jobID uuid.UUID) (papers.JobStatus, error)
+}
+
+type RetryHandler struct {
+	retrier JobRetrier
+}
+
+func NewRetryHandler(retrier JobRetrier) *RetryHandler {
+	return &RetryHandler{retrier: retrier}
+}
+
+func (h *RetryHandler) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid job id", http.StatusBadRequest)
+		return
+	}
+	job, err := h.retrier.RetryJob(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, papers.ErrNotFound) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, papers.ErrNotRetryable) {
+			http.Error(w, "job is not retryable", http.StatusConflict)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_ = json.NewEncoder(w).Encode(job)
+}

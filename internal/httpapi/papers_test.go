@@ -150,3 +150,52 @@ func TestGetPaperNotFound(t *testing.T) {
 		t.Fatalf("status = %d, want 404", resp.StatusCode)
 	}
 }
+
+type fakeRetrier struct {
+	job papers.JobStatus
+	err error
+}
+
+func (f *fakeRetrier) RetryJob(ctx context.Context, jobID uuid.UUID) (papers.JobStatus, error) {
+	return f.job, f.err
+}
+
+func TestRetryHandlerAccepted(t *testing.T) {
+	h := NewRetryHandler(&fakeRetrier{job: papers.JobStatus{Status: "queued"}})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+uuid.New().String()+"/retry", nil)
+	rr := httptest.NewRecorder()
+	NewRouter(Dependencies{RetryHandler: h}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202", rr.Code)
+	}
+}
+
+func TestRetryHandlerNotFound(t *testing.T) {
+	h := NewRetryHandler(&fakeRetrier{err: papers.ErrNotFound})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+uuid.New().String()+"/retry", nil)
+	rr := httptest.NewRecorder()
+	NewRouter(Dependencies{RetryHandler: h}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rr.Code)
+	}
+}
+
+func TestRetryHandlerConflict(t *testing.T) {
+	h := NewRetryHandler(&fakeRetrier{err: papers.ErrNotRetryable})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+uuid.New().String()+"/retry", nil)
+	rr := httptest.NewRecorder()
+	NewRouter(Dependencies{RetryHandler: h}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409", rr.Code)
+	}
+}
+
+func TestRetryHandlerBadUUID(t *testing.T) {
+	h := NewRetryHandler(&fakeRetrier{})
+	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/not-a-uuid/retry", nil)
+	rr := httptest.NewRecorder()
+	NewRouter(Dependencies{RetryHandler: h}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rr.Code)
+	}
+}

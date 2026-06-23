@@ -9,7 +9,7 @@ import (
 )
 
 type PaperReaderRunner interface {
-	ReadPaper(ctx context.Context, payload ProcessPaperPayload) error
+	ReadPaper(ctx context.Context, payload ProcessPaperPayload, attempt int32, isFinalAttempt bool) error
 }
 
 type ReadProcessor struct {
@@ -32,5 +32,9 @@ func (p *ReadProcessor) HandleReadPaper(ctx context.Context, task *asynq.Task) e
 	if p.pipeline == nil {
 		return fmt.Errorf("read pipeline is not configured")
 	}
-	return p.pipeline.ReadPaper(ctx, payload)
+	retryCount, _ := asynq.GetRetryCount(ctx)
+	maxRetry, ok := asynq.GetMaxRetry(ctx)
+	attempt := int32(retryCount + 1)
+	isFinalAttempt := !ok || retryCount >= maxRetry
+	return p.pipeline.ReadPaper(ctx, payload, attempt, isFinalAttempt)
 }

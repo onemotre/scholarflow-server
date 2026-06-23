@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -29,6 +30,16 @@ func (r *SQLRepository) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, st
 		Status:       status,
 		ErrorMessage: errorMessage,
 		AttemptCount: attemptIncrement,
+	})
+	return err
+}
+
+func (r *SQLRepository) SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attempt int32) error {
+	_, err := r.queries.SetJobStatusAndAttempt(ctx, db.SetJobStatusAndAttemptParams{
+		ID:           jobID,
+		Status:       status,
+		ErrorMessage: errorMessage,
+		AttemptCount: attempt,
 	})
 	return err
 }
@@ -245,4 +256,8 @@ func intPointer(value *int) *int32 {
 	}
 	v := int32(*value)
 	return &v
+}
+
+func (r *SQLRepository) DeleteFailedJobsOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
+	return r.queries.DeleteFailedJobsOlderThan(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }

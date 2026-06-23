@@ -24,6 +24,9 @@ type Config struct {
 	OpenAIAPIStyle         string
 	OpenAIResponseFormat   string
 	OpenAISystemPromptPath string
+	ReadMaxRetry           int
+	JobFailedRetentionDays int
+	JobCleanupCron         string
 }
 
 func Load() Config {
@@ -46,6 +49,9 @@ func Load() Config {
 		OpenAIAPIStyle:         envString("OPENAI_API_STYLE", "chat"),
 		OpenAIResponseFormat:   envString("OPENAI_RESPONSE_FORMAT", "json_schema"),
 		OpenAISystemPromptPath: envString("OPENAI_SYSTEM_PROMPT_PATH", ""),
+		ReadMaxRetry:           int(envInt64("READ_MAX_RETRY", 3)),
+		JobFailedRetentionDays: int(envInt64("JOB_FAILED_RETENTION_DAYS", 7)),
+		JobCleanupCron:         envString("JOB_CLEANUP_CRON", "@daily"),
 	}
 }
 

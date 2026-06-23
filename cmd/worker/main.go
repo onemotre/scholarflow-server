@@ -43,7 +43,7 @@ func main() {
 	if readerConfigured {
 		client := asynq.NewClient(redisOpt)
 		defer client.Close()
-		enqueuer := jobs.NewEnqueuer(client)
+		enqueuer := jobs.NewEnqueuer(client, cfg.ReadMaxRetry)
 		readEnqueuer = enqueuer
 
 		rdr := reader.NewOpenAIReader(reader.OpenAIConfig{
@@ -66,8 +66,24 @@ func main() {
 	pipeline := jobs.NewPipeline(repo, store, parser.NewGROBIDParser(cfg.GROBIDURL), readEnqueuer)
 	jobs.NewProcessor(pipeline).Register(mux)
 
+	jobs.NewCleanupProcessor(repo, cfg.JobFailedRetentionDays).Register(mux)
+
 	server := asynq.NewServer(redisOpt, asynq.Config{Concurrency: 2})
-	log.Printf("starting worker redis=%s grobid=%s", cfg.RedisAddr, cfg.GROBIDURL)
+
+	scheduler := asynq.NewScheduler(redisOpt, &asynq.SchedulerOpts{})
+	cleanupTask, err := jobs.NewCleanupJobsTask()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := scheduler.Register(cfg.JobCleanupCron, cleanupTask); err != nil {
+		log.Fatal(err)
+	}
+	if err := scheduler.Start(); err != nil {
+		log.Fatal(err)
+	}
+	defer scheduler.Shutdown()
+
+	log.Printf("starting worker redis=%s grobid=%s cleanup_cron=%s", cfg.RedisAddr, cfg.GROBIDURL, cfg.JobCleanupCron)
 	if err := server.Run(mux); err != nil {
 		log.Fatal(err)
 	}

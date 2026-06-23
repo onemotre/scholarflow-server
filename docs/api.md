@@ -95,6 +95,19 @@ When `OPENAI_BASE_URL` and `OPENAI_API_KEY` are set, a successful parse enqueues
 
 If the reader is not configured, the job stops at `parsed`. The latest card is returned in the `card` field of `GET /v1/papers/{id}`.
 
+### POST /v1/jobs/{id}/retry
+
+Retries a failed processing job. Returns `409` unless the job status is
+`failed`. The stage is inferred from paper state: if the paper has parsed
+sections the read stage is re-run, otherwise the parse stage is re-run. The job
+row is reset (`status=queued`, `attempt_count=0`, `error_message=null`) and the
+appropriate task re-enqueued.
+
+- `202 Accepted` + the reset job JSON on success
+- `404 Not Found` for an unknown job id
+- `409 Conflict` when the job is not in a retryable (`failed`) state
+- `400 Bad Request` for a malformed job id
+
 ### Reader Configuration
 
 Three optional env vars tune reader behavior (all have defaults; the reader is still disabled until `OPENAI_BASE_URL`/`OPENAI_API_KEY` are set):
@@ -102,3 +115,6 @@ Three optional env vars tune reader behavior (all have defaults; the reader is s
 - `OPENAI_API_STYLE` (default `chat`): `chat` uses `/chat/completions`; `responses` uses the OpenAI Responses API (`/responses`). Switch to `responses` only if your provider supports it.
 - `OPENAI_RESPONSE_FORMAT` (default `json_schema`): enforce the full paper-card schema via Structured Outputs. Set to `json_object` if your provider rejects JSON-schema requests.
 - `OPENAI_SYSTEM_PROMPT_PATH` (default empty): path to a system-prompt file that overrides the built-in default at runtime; falls back to the embedded default if unset or unreadable. **The path is resolved inside the process**, so under docker-compose it must be a container path, not a host path. The built-in default lives in `internal/reader/prompts/system.md`, which is `go:embed`-baked into the binary and is **not** present in the runtime image — `internal/reader/prompts/` is mounted read-only to `/app/prompts` by compose, so drop a custom prompt there on the host and set e.g. `OPENAI_SYSTEM_PROMPT_PATH=/app/prompts/your.md`. The prompt is loaded once at worker startup.
+- `READ_MAX_RETRY` (default `3`): asynq max retries for the read task. While retries remain the job stays `reading`; it becomes `failed` only after the final attempt. Every failed attempt is logged to worker stdout.
+- `JOB_FAILED_RETENTION_DAYS` (default `7`): failed job rows older than this are deleted by the daily cleanup.
+- `JOB_CLEANUP_CRON` (default `@daily`): cron spec for the cleanup schedule. With multiple worker replicas, only one should run the scheduler to avoid duplicate cleanup enqueues.

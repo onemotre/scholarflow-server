@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPaperSections = `-- name: CountPaperSections :one
+SELECT count(*) FROM paper_sections WHERE paper_id = $1
+`
+
+func (q *Queries) CountPaperSections(ctx context.Context, paperID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPaperSections, paperID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createPaper = `-- name: CreatePaper :one
 INSERT INTO papers (source_type, status, uploaded_filename)
 VALUES ($1, $2, $3)
@@ -349,6 +360,19 @@ func (q *Queries) CreateProcessingJob(ctx context.Context, arg CreateProcessingJ
 	return i, err
 }
 
+const deleteFailedJobsOlderThan = `-- name: DeleteFailedJobsOlderThan :execrows
+DELETE FROM paper_processing_jobs
+WHERE status = 'failed' AND updated_at < $1
+`
+
+func (q *Queries) DeleteFailedJobsOlderThan(ctx context.Context, updatedAt pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteFailedJobsOlderThan, updatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePaperAuthors = `-- name: DeletePaperAuthors :exec
 DELETE FROM paper_authors WHERE paper_id = $1
 `
@@ -614,6 +638,64 @@ func (q *Queries) ListPaperSections(ctx context.Context, paperID uuid.UUID) ([]P
 		return nil, err
 	}
 	return items, nil
+}
+
+const resetFailedJob = `-- name: ResetFailedJob :execrows
+UPDATE paper_processing_jobs
+SET status = 'queued',
+    attempt_count = 0,
+    error_message = NULL,
+    completed_at = NULL,
+    updated_at = now()
+WHERE id = $1 AND status = 'failed'
+`
+
+func (q *Queries) ResetFailedJob(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, resetFailedJob, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setJobStatusAndAttempt = `-- name: SetJobStatusAndAttempt :one
+UPDATE paper_processing_jobs
+SET status = $2,
+    error_message = $3,
+    attempt_count = $4,
+    updated_at = now(),
+    completed_at = CASE WHEN $2 IN ('completed', 'failed') THEN now() ELSE completed_at END
+WHERE id = $1
+RETURNING id, paper_id, status, task_id, error_message, attempt_count, created_at, updated_at, completed_at
+`
+
+type SetJobStatusAndAttemptParams struct {
+	ID           uuid.UUID
+	Status       string
+	ErrorMessage *string
+	AttemptCount int32
+}
+
+func (q *Queries) SetJobStatusAndAttempt(ctx context.Context, arg SetJobStatusAndAttemptParams) (PaperProcessingJob, error) {
+	row := q.db.QueryRow(ctx, setJobStatusAndAttempt,
+		arg.ID,
+		arg.Status,
+		arg.ErrorMessage,
+		arg.AttemptCount,
+	)
+	var i PaperProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.Status,
+		&i.TaskID,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
 }
 
 const setProcessingJobTaskID = `-- name: SetProcessingJobTaskID :one
