@@ -82,6 +82,9 @@ func TestRetryJobParseStageWhenNotParsed(t *testing.T) {
 	if !enq.processCalled || enq.readCalled {
 		t.Fatal("unparsed paper must re-enqueue parse, not read")
 	}
+	if repo.taskIDSet != "task-process" {
+		t.Fatalf("task id = %q, want task-process", repo.taskIDSet)
+	}
 }
 
 func TestRetryJobRejectsLostRace(t *testing.T) {

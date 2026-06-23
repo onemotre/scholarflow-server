@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/hibiken/asynq"
 )
 
 type fakeCleanupRepo struct {
@@ -45,5 +43,4 @@ func TestNewCleanupJobsTaskType(t *testing.T) {
 	if task.Type() != TypeCleanupJobs {
 		t.Fatalf("type = %q, want %q", task.Type(), TypeCleanupJobs)
 	}
-	_ = asynq.Task{}
 }
