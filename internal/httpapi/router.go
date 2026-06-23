@@ -9,6 +9,7 @@ import (
 type Dependencies struct {
 	UploadHandler *UploadHandler
 	ReadHandler   *ReadHandler
+	RetryHandler  *RetryHandler
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -23,6 +24,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	if deps.ReadHandler != nil {
 		r.Get("/v1/jobs/{id}", deps.ReadHandler.GetJob)
 		r.Get("/v1/papers/{id}", deps.ReadHandler.GetPaper)
+	}
+	if deps.RetryHandler != nil {
+		r.Post("/v1/jobs/{id}/retry", deps.RetryHandler.Retry)
 	}
 	return r
 }

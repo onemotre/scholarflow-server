@@ -41,10 +41,12 @@ func main() {
 	enqueuer := jobs.NewEnqueuer(asynqClient, cfg.ReadMaxRetry)
 	paperService := papers.NewService(repo, store, enqueuer)
 	uploadHandler := httpapi.NewUploadHandler(paperService, cfg.MaxUploadBytes)
-	readHandler := httpapi.NewReadHandler(papers.NewSQLReadRepository(queries))
+	readRepo := papers.NewSQLReadRepository(queries)
+	readHandler := httpapi.NewReadHandler(readRepo)
+	retryHandler := httpapi.NewRetryHandler(papers.NewRetryService(readRepo, enqueuer))
 
 	log.Printf("starting api on %s", cfg.HTTPAddr)
-	if err := http.ListenAndServe(cfg.HTTPAddr, httpapi.NewRouter(httpapi.Dependencies{UploadHandler: uploadHandler, ReadHandler: readHandler})); err != nil {
+	if err := http.ListenAndServe(cfg.HTTPAddr, httpapi.NewRouter(httpapi.Dependencies{UploadHandler: uploadHandler, ReadHandler: readHandler, RetryHandler: retryHandler})); err != nil {
 		log.Fatal(err)
 	}
 }
