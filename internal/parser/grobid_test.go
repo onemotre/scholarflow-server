@@ -1,6 +1,14 @@
 package parser
 
-import "testing"
+import (
+	"context"
+	"io"
+	"mime"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestParseTEIExtractsTitleAbstractAuthorAndSection(t *testing.T) {
 	tei := `<?xml version="1.0"?>
@@ -88,6 +96,73 @@ func TestParseTEIExtractsDOIYearReferences(t *testing.T) {
 	if len(r.Authors) != 1 || r.Authors[0] != "Grace Hopper" {
 		t.Fatalf("Reference authors = %#v", r.Authors)
 	}
+}
+
+func TestParseTEIExtractsSectionPagesFromCoords(t *testing.T) {
+	tei := `<TEI><text><body>
+	  <div><head coords="2,1,2,3,4">Method</head><p coords="2,1,2,3,4">First.</p><p coords="3,1,2,3,4">Second with <ref>[1]</ref> cite.</p></div>
+	  <div><head>No Coords</head><p>plain</p></div>
+	</body></text></TEI>`
+	parsed, err := parseTEI([]byte(tei))
+	if err != nil {
+		t.Fatalf("parseTEI error: %v", err)
+	}
+	if len(parsed.Sections) != 2 {
+		t.Fatalf("Sections = %#v", parsed.Sections)
+	}
+	s0 := parsed.Sections[0]
+	if s0.Heading != "Method" {
+		t.Fatalf("Section[0].Heading = %q", s0.Heading)
+	}
+	if s0.Text != "First.\n\nSecond with [1] cite." {
+		t.Fatalf("Section[0].Text = %q", s0.Text)
+	}
+	if s0.PageStart == nil || *s0.PageStart != 2 || s0.PageEnd == nil || *s0.PageEnd != 3 {
+		t.Fatalf("Section[0] pages = %v..%v", s0.PageStart, s0.PageEnd)
+	}
+	if s1 := parsed.Sections[1]; s1.PageStart != nil || s1.PageEnd != nil {
+		t.Fatalf("Section[1] pages = %v..%v, want nil", s1.PageStart, s1.PageEnd)
+	}
+}
+
+func TestParsePDFRequestsTEICoordinates(t *testing.T) {
+	var gotCoords []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, params, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		mr, err := r.MultipartReader()
+		if err == nil {
+			_ = params
+			for {
+				part, err := mr.NextPart()
+				if err != nil {
+					break
+				}
+				if part.FormName() == "teiCoordinates" {
+					b, _ := io.ReadAll(part)
+					gotCoords = append(gotCoords, string(b))
+				}
+			}
+		}
+		_, _ = io.WriteString(w, `<TEI><text><body><div><head>X</head><p>y</p></div></body></text></TEI>`)
+	}))
+	defer srv.Close()
+
+	p := NewGROBIDParser(srv.URL)
+	if _, err := p.ParsePDF(context.Background(), "f.pdf", strings.NewReader("%PDF-1.4")); err != nil {
+		t.Fatalf("ParsePDF error: %v", err)
+	}
+	if !contains(gotCoords, "figure") {
+		t.Fatalf("teiCoordinates fields = %v, want to include \"figure\"", gotCoords)
+	}
+}
+
+func contains(xs []string, want string) bool {
+	for _, x := range xs {
+		if x == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestParseTEIExtractsFigures(t *testing.T) {

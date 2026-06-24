@@ -95,6 +95,13 @@ When `OPENAI_BASE_URL` and `OPENAI_API_KEY` are set, a successful parse enqueues
 
 If the reader is not configured, the job stops at `parsed`. The latest card is returned in the `card` field of `GET /v1/papers/{id}`.
 
+The card (schema `2.0`) contains the scalar fields (`background`, `problem`, `method`, `implementation`), list fields (`benchmarks`, `baselines`, `results`, `code_links`, `data_links`), a `figures` array, and an `evidence` array:
+
+- `evidence[]`: `{claim_key, claim_index, evidence_type, section_id, page, snippet, confidence}`. `claim_index` is the 0-based item index when the evidence supports a specific bullet of a list field (else `null`). `page` is clamped server-side to the cited section's page range.
+- `figures[]`: `{label, claim_key, claim_index, page}` — a placement of a figure/table at a claim anchor. `page` is filled server-side from the GROBID figure record, not the model.
+
+Pages are PDF physical-page indices (page-level granularity); they can differ from a printed page label on offset-paginated reprints, and depend on GROBID emitting `@coords`.
+
 ### POST /v1/jobs/{id}/retry
 
 Retries a failed processing job. Returns `409` unless the job status is

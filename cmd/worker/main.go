@@ -10,6 +10,7 @@ import (
 	"scholarflow_server/internal/config"
 	dbpkg "scholarflow_server/internal/db"
 	"scholarflow_server/internal/jobs"
+	"scholarflow_server/internal/migrate"
 	"scholarflow_server/internal/parser"
 	"scholarflow_server/internal/reader"
 	"scholarflow_server/internal/storage"
@@ -18,6 +19,10 @@ import (
 func main() {
 	ctx := context.Background()
 	cfg := config.Load()
+
+	if err := migrate.Run(ctx, cfg.DatabaseURL); err != nil {
+		log.Fatal(err)
+	}
 
 	pool, err := dbpkg.Open(ctx, cfg.DatabaseURL)
 	if err != nil {

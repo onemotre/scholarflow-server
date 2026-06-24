@@ -1,4 +1,4 @@
-.PHONY: test fmt dev deps-up deps-down migrate
+.PHONY: test fmt up dev deps-up deps-down migrate
 
 test:
 	go test ./...
@@ -6,8 +6,14 @@ test:
 fmt:
 	go fmt ./...
 
+# Build and start the full server stack (api, worker, postgres, redis, minio,
+# grobid) in the background. Schema migrations run automatically at startup.
+up:
+	docker compose up -d --build
+
+# Same as `up` but stays attached and streams logs.
 dev:
-	docker compose up
+	docker compose up --build
 
 deps-up:
 	docker compose up postgres redis minio grobid

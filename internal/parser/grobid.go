@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// coordinateElements are the TEI element names we ask GROBID to annotate with
+// @coords (page,x,y,w,h), so figure and section pages can be recovered.
+var coordinateElements = []string{"figure", "head", "p", "s"}
+
 type GROBIDParser struct {
 	baseURL string
 	client  *http.Client
@@ -34,6 +38,13 @@ func (p *GROBIDParser) ParsePDF(ctx context.Context, filename string, body io.Re
 	}
 	if _, err := io.Copy(part, body); err != nil {
 		return ParsedPaper{}, err
+	}
+	// Ask GROBID to emit @coords on these elements so we can recover the page a
+	// figure or section sits on. Without this, coords are absent and pages are nil.
+	for _, tag := range coordinateElements {
+		if err := writer.WriteField("teiCoordinates", tag); err != nil {
+			return ParsedPaper{}, err
+		}
 	}
 	if err := writer.Close(); err != nil {
 		return ParsedPaper{}, err
@@ -158,8 +169,16 @@ type teiFigure struct {
 }
 
 type teiDiv struct {
-	Head       string   `xml:"head"`
-	Paragraphs []string `xml:"p"`
+	Head       teiTextCoord   `xml:"head"`
+	Paragraphs []teiTextCoord `xml:"p"`
+}
+
+// teiTextCoord captures an element's inner text plus its @coords attribute.
+// Inner is raw inner XML (so nested <ref>/<s> text is preserved); plainText
+// strips the tags. Coords is GROBID's "page,x,y,w,h" (possibly ";"-separated).
+type teiTextCoord struct {
+	Coords string `xml:"coords,attr"`
+	Inner  string `xml:",innerxml"`
 }
 
 type teiParagraphs struct {
@@ -184,14 +203,26 @@ func parseTEI(raw []byte) (ParsedPaper, error) {
 		parsed.Authors = append(parsed.Authors, Author{Order: int32(i + 1), DisplayName: name})
 	}
 	for i, div := range doc.Text.Body.Divs {
-		text := strings.TrimSpace(strings.Join(div.Paragraphs, "\n\n"))
+		var paras []string
+		var pages []int32
+		pages = appendCoordPages(pages, div.Head.Coords)
+		for _, p := range div.Paragraphs {
+			if t := plainText(p.Inner); t != "" {
+				paras = append(paras, t)
+			}
+			pages = appendCoordPages(pages, p.Coords)
+		}
+		text := strings.TrimSpace(strings.Join(paras, "\n\n"))
 		if text == "" {
 			continue
 		}
+		start, end := pageRange(pages)
 		parsed.Sections = append(parsed.Sections, Section{
-			Order:   int32(i + 1),
-			Heading: strings.TrimSpace(div.Head),
-			Text:    text,
+			Order:     int32(i + 1),
+			Heading:   strings.TrimSpace(plainText(div.Head.Inner)),
+			Text:      text,
+			PageStart: start,
+			PageEnd:   end,
 		})
 	}
 	bibl := doc.Header.FileDesc.SourceDesc.Bibl
@@ -268,6 +299,66 @@ func authorNames(authors []teiAuthor) []string {
 		}
 	}
 	return names
+}
+
+// plainText extracts the character data from a fragment of inner XML, dropping
+// tags (e.g. nested <ref>/<s>) while keeping their text and resolving entities.
+func plainText(inner string) string {
+	if inner == "" {
+		return ""
+	}
+	dec := xml.NewDecoder(strings.NewReader(inner))
+	var b strings.Builder
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		if cd, ok := tok.(xml.CharData); ok {
+			b.Write(cd)
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// appendCoordPages parses every page index found in a GROBID @coords value
+// ("page,x,y,w,h", possibly ";"-separated boxes) and appends them to pages.
+func appendCoordPages(pages []int32, coords string) []int32 {
+	coords = strings.TrimSpace(coords)
+	if coords == "" {
+		return pages
+	}
+	for _, box := range strings.Split(coords, ";") {
+		box = strings.TrimSpace(box)
+		if box == "" {
+			continue
+		}
+		first := box
+		if idx := strings.IndexByte(box, ','); idx >= 0 {
+			first = box[:idx]
+		}
+		if p, err := strconv.Atoi(strings.TrimSpace(first)); err == nil && p > 0 {
+			pages = append(pages, int32(p))
+		}
+	}
+	return pages
+}
+
+// pageRange returns the min and max page in pages, or (nil, nil) when empty.
+func pageRange(pages []int32) (*int32, *int32) {
+	if len(pages) == 0 {
+		return nil, nil
+	}
+	lo, hi := pages[0], pages[0]
+	for _, p := range pages[1:] {
+		if p < lo {
+			lo = p
+		}
+		if p > hi {
+			hi = p
+		}
+	}
+	return &lo, &hi
 }
 
 func parsePage(coords string) *int32 {

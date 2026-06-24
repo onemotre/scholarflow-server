@@ -192,10 +192,12 @@ func (r *SQLRepository) GetReadContext(ctx context.Context, paperID uuid.UUID) (
 	rc := ReadContext{Title: stringValue(paper.Title), Abstract: stringValue(paper.Abstract)}
 	for _, s := range sections {
 		rc.Sections = append(rc.Sections, ReadSection{
-			ID:      s.ID,
-			Label:   strconv.FormatInt(int64(s.SectionOrder), 10),
-			Heading: stringValue(s.Heading),
-			Text:    s.Text,
+			ID:        s.ID,
+			Label:     strconv.FormatInt(int64(s.SectionOrder), 10),
+			Heading:   stringValue(s.Heading),
+			Text:      s.Text,
+			PageStart: s.PageStart,
+			PageEnd:   s.PageEnd,
 		})
 	}
 	figures, err := r.queries.ListPaperFigures(ctx, paperID)
@@ -203,7 +205,7 @@ func (r *SQLRepository) GetReadContext(ctx context.Context, paperID uuid.UUID) (
 		return ReadContext{}, fmt.Errorf("list figures: %w", err)
 	}
 	for _, f := range figures {
-		rc.Figures = append(rc.Figures, ReadFigure{Label: f.Label, Kind: f.Kind, Caption: f.Caption})
+		rc.Figures = append(rc.Figures, ReadFigure{Label: f.Label, Kind: f.Kind, Caption: f.Caption, Page: f.Page})
 	}
 	return rc, nil
 }

@@ -12,6 +12,7 @@ var ErrDisallowedKey = errors.New("limitations field is not allowed")
 
 type Evidence struct {
 	ClaimKey     string  `json:"claim_key"`
+	ClaimIndex   *int    `json:"claim_index,omitempty"`
 	EvidenceType string  `json:"evidence_type"`
 	SectionID    string  `json:"section_id,omitempty"`
 	AssetID      string  `json:"asset_id,omitempty"`
@@ -21,18 +22,27 @@ type Evidence struct {
 	Confidence   float64 `json:"confidence"`
 }
 
+// FigureRef places a figure (by its label) at a claim anchor. Page is resolved
+// server-side from the GROBID figure record, not supplied by the model.
+type FigureRef struct {
+	Label      string `json:"label"`
+	ClaimKey   string `json:"claim_key"`
+	ClaimIndex *int   `json:"claim_index,omitempty"`
+	Page       *int   `json:"page,omitempty"`
+}
+
 type PaperCard struct {
-	Background     string     `json:"background"`
-	Problem        string     `json:"problem"`
-	Method         string     `json:"method"`
-	Implementation string     `json:"implementation"`
-	Benchmarks     []string   `json:"benchmarks"`
-	Baselines      []string   `json:"baselines"`
-	Results        []string   `json:"results"`
-	CodeLinks      []string   `json:"code_links"`
-	DataLinks      []string   `json:"data_links"`
-	KeyFigures     []string   `json:"key_figures"`
-	Evidence       []Evidence `json:"evidence"`
+	Background     string      `json:"background"`
+	Problem        string      `json:"problem"`
+	Method         string      `json:"method"`
+	Implementation string      `json:"implementation"`
+	Benchmarks     []string    `json:"benchmarks"`
+	Baselines      []string    `json:"baselines"`
+	Results        []string    `json:"results"`
+	CodeLinks      []string    `json:"code_links"`
+	DataLinks      []string    `json:"data_links"`
+	Figures        []FigureRef `json:"figures"`
+	Evidence       []Evidence  `json:"evidence"`
 }
 
 type Context struct {
@@ -43,15 +53,18 @@ type Context struct {
 }
 
 type Section struct {
-	Label   string
-	Heading string
-	Text    string
+	Label     string
+	Heading   string
+	Text      string
+	PageStart *int
+	PageEnd   *int
 }
 
 type Figure struct {
 	Label   string
 	Kind    string
 	Caption string
+	Page    *int
 }
 
 type Reader interface {
@@ -79,9 +92,10 @@ func cardJSONSchema() map[string]any {
 	evidence := map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"required":             []string{"claim_key", "evidence_type", "section_id", "asset_id", "page", "locator", "snippet", "confidence"},
+		"required":             []string{"claim_key", "claim_index", "evidence_type", "section_id", "asset_id", "page", "locator", "snippet", "confidence"},
 		"properties": map[string]any{
 			"claim_key":     map[string]any{"type": "string"},
+			"claim_index":   map[string]any{"type": []string{"integer", "null"}},
 			"evidence_type": map[string]any{"type": "string"},
 			"section_id":    map[string]any{"type": "string"},
 			"asset_id":      map[string]any{"type": "string"},
@@ -91,10 +105,20 @@ func cardJSONSchema() map[string]any {
 			"confidence":    map[string]any{"type": "number"},
 		},
 	}
+	figure := map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"label", "claim_key", "claim_index"},
+		"properties": map[string]any{
+			"label":       map[string]any{"type": "string"},
+			"claim_key":   map[string]any{"type": "string"},
+			"claim_index": map[string]any{"type": []string{"integer", "null"}},
+		},
+	}
 	return map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"required":             []string{"background", "problem", "method", "implementation", "benchmarks", "baselines", "results", "code_links", "data_links", "key_figures", "evidence"},
+		"required":             []string{"background", "problem", "method", "implementation", "benchmarks", "baselines", "results", "code_links", "data_links", "figures", "evidence"},
 		"properties": map[string]any{
 			"background":     map[string]any{"type": "string"},
 			"problem":        map[string]any{"type": "string"},
@@ -105,7 +129,7 @@ func cardJSONSchema() map[string]any {
 			"results":        strArray(),
 			"code_links":     strArray(),
 			"data_links":     strArray(),
-			"key_figures":    strArray(),
+			"figures":        map[string]any{"type": "array", "items": figure},
 			"evidence":       map[string]any{"type": "array", "items": evidence},
 		},
 	}

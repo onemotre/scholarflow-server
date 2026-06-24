@@ -24,19 +24,6 @@ queued -> processing -> parsed -> reading -> completed
 
 如果没有配置 Reader，任务会停在 `parsed`。配置 `OPENAI_BASE_URL` 和 `OPENAI_API_KEY` 后，解析成功的任务会继续进入 `reading`，成功后变为 `completed`。
 
-## 技术栈 🧰
-
-- Go 1.26.4
-- HTTP: `go-chi/chi`
-- PostgreSQL + `pgx`
-- SQL 生成: `sqlc`
-- 数据库迁移: `goose`
-- 队列: Redis + `hibiken/asynq`
-- 对象存储: MinIO / S3-compatible storage
-- PDF 解析: GROBID
-- LLM Reader: OpenAI-compatible API
-- 本地环境: Docker Compose
-
 ## 目录结构 🗂️
 
 ```text

@@ -97,6 +97,53 @@ func TestReadPipelineCompletes(t *testing.T) {
 	}
 }
 
+func TestReadPipelineResolvesPages(t *testing.T) {
+	sectionID := uuid.New()
+	p3, p5, p9 := int32(3), int32(5), int32(9)
+	repo := &fakeReadRepo{rc: ReadContext{
+		Title:    "T",
+		Abstract: "A",
+		Sections: []ReadSection{{ID: sectionID, Label: "1", Heading: "Results", Text: "Body", PageStart: &p3, PageEnd: &p5}},
+		Figures:  []ReadFigure{{Label: "Figure 2", Kind: "figure", Caption: "cap", Page: &p9}},
+	}}
+	ev0 := 7 // out of [3,5] -> clamp to 5
+	ev1 := 4 // within range -> keep
+	rdr := &fakeReader{card: reader.PaperCard{
+		Background: "bg", Problem: "p", Method: "m", Implementation: "impl",
+		Results: []string{"r0"},
+		Figures: []reader.FigureRef{{Label: "figure 2", ClaimKey: "results", ClaimIndex: intPtr(0)}},
+		Evidence: []reader.Evidence{
+			{ClaimKey: "results", SectionID: "1", Page: &ev0},
+			{ClaimKey: "results", SectionID: "1", Page: &ev1},
+			{ClaimKey: "method", SectionID: "999"}, // unknown section -> untouched
+		},
+	}}
+	pipe := NewReadPipeline(repo, rdr, "m")
+
+	if err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()}, 1, true); err != nil {
+		t.Fatalf("ReadPaper error: %v", err)
+	}
+	// Figure page comes from GROBID (label match is case/space-insensitive).
+	if got := repo.saved.Figures[0].Page; got == nil || *got != 9 {
+		t.Fatalf("figure page = %v, want 9", got)
+	}
+	if got := repo.saved.Evidence[0].Page; got == nil || *got != 5 {
+		t.Fatalf("evidence[0] page = %v, want clamped 5", got)
+	}
+	if got := repo.saved.Evidence[1].Page; got == nil || *got != 4 {
+		t.Fatalf("evidence[1] page = %v, want 4", got)
+	}
+	if repo.saved.Evidence[2].Page != nil {
+		t.Fatalf("evidence[2] page = %v, want nil (unknown section)", repo.saved.Evidence[2].Page)
+	}
+	// Reader received page context.
+	if rdr.got.Sections[0].PageStart == nil || *rdr.got.Sections[0].PageStart != 3 {
+		t.Fatalf("reader section page = %v", rdr.got.Sections[0].PageStart)
+	}
+}
+
+func intPtr(v int) *int { return &v }
+
 func TestReadPipelineNonFinalFailureStaysReading(t *testing.T) {
 	repo := &fakeReadRepo{rc: ReadContext{Title: "T"}}
 	rdr := &fakeReader{err: errors.New("llm down")}
