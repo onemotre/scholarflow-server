@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -44,11 +45,11 @@ func (h *FigureImageHandler) GetFigureImage(w http.ResponseWriter, r *http.Reque
 	}
 	obj, err := h.store.Get(r.Context(), key)
 	if err != nil {
+		log.Printf("figure image: store.Get %s: %v", key, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	defer obj.Close()
 	w.Header().Set("Content-Type", "image/png")
-	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, obj)
 }

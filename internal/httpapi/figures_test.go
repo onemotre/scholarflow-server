@@ -23,15 +23,18 @@ func (f *fakeFigureReader) GetFigureImageKey(ctx context.Context, paperID, figur
 }
 
 type fakeObjectStore struct {
-	body string
+	body   string
+	gotKey string
 }
 
 func (s *fakeObjectStore) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	s.gotKey = key
 	return io.NopCloser(strings.NewReader(s.body)), nil
 }
 
 func TestGetFigureImageReturnsPNG(t *testing.T) {
-	h := NewFigureImageHandler(&fakeFigureReader{key: "papers/x/figures/1.png"}, &fakeObjectStore{body: "PNGDATA"})
+	store := &fakeObjectStore{body: "PNGDATA"}
+	h := NewFigureImageHandler(&fakeFigureReader{key: "papers/x/figures/1.png"}, store)
 	router := NewRouter(Dependencies{FigureImageHandler: h})
 
 	url := "/v1/papers/" + uuid.New().String() + "/figures/" + uuid.New().String() + "/image"
@@ -46,6 +49,9 @@ func TestGetFigureImageReturnsPNG(t *testing.T) {
 	}
 	if rec.Body.String() != "PNGDATA" {
 		t.Fatalf("body = %q", rec.Body.String())
+	}
+	if store.gotKey != "papers/x/figures/1.png" {
+		t.Fatalf("store got key = %q, want %q", store.gotKey, "papers/x/figures/1.png")
 	}
 }
 
