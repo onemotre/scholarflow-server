@@ -29,6 +29,16 @@ services:
       - minio
       - grobid
 
+  web:
+    build: ../scholarflow_web
+    environment:
+      SCHOLARFLOW_API_URL: http://api:8080
+      WEB_ADDR: ":8090"
+    ports:
+      - "8090:8090"
+    depends_on:
+      - api
+
   postgres:
     image: postgres:16
     environment:
