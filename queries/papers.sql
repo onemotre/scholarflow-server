@@ -149,3 +149,9 @@ LIMIT 500;
 UPDATE paper_figures
 SET image_asset_id = sqlc.arg(image_asset_id)
 WHERE paper_id = sqlc.arg(paper_id) AND figure_order = sqlc.arg(figure_order);
+
+-- name: GetFigureImageAsset :one
+SELECT a.*
+FROM paper_figures f
+JOIN paper_assets a ON a.id = f.image_asset_id
+WHERE f.id = sqlc.arg(figure_id) AND f.paper_id = sqlc.arg(paper_id);

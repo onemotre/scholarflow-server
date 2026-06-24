@@ -418,6 +418,35 @@ func (q *Queries) DeletePaperSections(ctx context.Context, paperID uuid.UUID) er
 	return err
 }
 
+const getFigureImageAsset = `-- name: GetFigureImageAsset :one
+SELECT a.id, a.paper_id, a.asset_type, a.storage_bucket, a.storage_key, a.content_type, a.size_bytes, a.checksum, a.created_at
+FROM paper_figures f
+JOIN paper_assets a ON a.id = f.image_asset_id
+WHERE f.id = $1 AND f.paper_id = $2
+`
+
+type GetFigureImageAssetParams struct {
+	FigureID uuid.UUID
+	PaperID  uuid.UUID
+}
+
+func (q *Queries) GetFigureImageAsset(ctx context.Context, arg GetFigureImageAssetParams) (PaperAsset, error) {
+	row := q.db.QueryRow(ctx, getFigureImageAsset, arg.FigureID, arg.PaperID)
+	var i PaperAsset
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.AssetType,
+		&i.StorageBucket,
+		&i.StorageKey,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Checksum,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getLatestPaperCard = `-- name: GetLatestPaperCard :one
 SELECT id, paper_id, schema_version, model, content_json, created_at FROM paper_cards WHERE paper_id = $1 ORDER BY created_at DESC LIMIT 1
 `
