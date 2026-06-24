@@ -260,6 +260,29 @@ func intPointer(value *int) *int32 {
 	return &v
 }
 
+func (r *SQLRepository) AttachFigureImage(ctx context.Context, paperID uuid.UUID, figureOrder int32, asset storage.Object) error {
+	created, err := r.queries.CreatePaperAsset(ctx, db.CreatePaperAssetParams{
+		PaperID:       paperID,
+		AssetType:     "figure-image",
+		StorageBucket: asset.Bucket,
+		StorageKey:    asset.Key,
+		ContentType:   asset.ContentType,
+		SizeBytes:     asset.SizeBytes,
+		Checksum:      stringPointer(asset.Checksum),
+	})
+	if err != nil {
+		return fmt.Errorf("create figure image asset: %w", err)
+	}
+	if err := r.queries.SetPaperFigureImageAsset(ctx, db.SetPaperFigureImageAssetParams{
+		PaperID:      paperID,
+		FigureOrder:  figureOrder,
+		ImageAssetID: pgtype.UUID{Bytes: created.ID, Valid: true},
+	}); err != nil {
+		return fmt.Errorf("set figure image asset: %w", err)
+	}
+	return nil
+}
+
 func (r *SQLRepository) DeleteFailedJobsOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
 	return r.queries.DeleteFailedJobsOlderThan(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }

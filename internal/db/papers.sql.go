@@ -741,6 +741,23 @@ func (q *Queries) SetJobStatusAndAttempt(ctx context.Context, arg SetJobStatusAn
 	return i, err
 }
 
+const setPaperFigureImageAsset = `-- name: SetPaperFigureImageAsset :exec
+UPDATE paper_figures
+SET image_asset_id = $1
+WHERE paper_id = $2 AND figure_order = $3
+`
+
+type SetPaperFigureImageAssetParams struct {
+	ImageAssetID pgtype.UUID
+	PaperID      uuid.UUID
+	FigureOrder  int32
+}
+
+func (q *Queries) SetPaperFigureImageAsset(ctx context.Context, arg SetPaperFigureImageAssetParams) error {
+	_, err := q.db.Exec(ctx, setPaperFigureImageAsset, arg.ImageAssetID, arg.PaperID, arg.FigureOrder)
+	return err
+}
+
 const setProcessingJobTaskID = `-- name: SetProcessingJobTaskID :one
 UPDATE paper_processing_jobs
 SET task_id = $2,

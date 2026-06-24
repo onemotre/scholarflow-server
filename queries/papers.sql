@@ -144,3 +144,8 @@ SELECT id, title, status, publication_year, uploaded_filename, created_at
 FROM papers
 ORDER BY created_at DESC
 LIMIT 500;
+
+-- name: SetPaperFigureImageAsset :exec
+UPDATE paper_figures
+SET image_asset_id = sqlc.arg(image_asset_id)
+WHERE paper_id = sqlc.arg(paper_id) AND figure_order = sqlc.arg(figure_order);
