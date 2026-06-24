@@ -138,3 +138,9 @@ SELECT count(*) FROM paper_sections WHERE paper_id = $1;
 -- name: DeleteFailedJobsOlderThan :execrows
 DELETE FROM paper_processing_jobs
 WHERE status = 'failed' AND updated_at < $1;
+
+-- name: ListPapers :many
+SELECT id, title, status, publication_year, uploaded_filename, created_at
+FROM papers
+ORDER BY created_at DESC
+LIMIT 500;

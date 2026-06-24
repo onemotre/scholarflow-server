@@ -15,6 +15,7 @@ import (
 type PaperReader interface {
 	GetJob(ctx context.Context, jobID uuid.UUID) (papers.JobStatus, error)
 	GetPaperDetail(ctx context.Context, paperID uuid.UUID) (papers.PaperDetail, error)
+	ListPapers(ctx context.Context) ([]papers.PaperSummary, error)
 }
 
 type ReadHandler struct {
@@ -37,6 +38,15 @@ func (h *ReadHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, job)
+}
+
+func (h *ReadHandler) ListPapers(w http.ResponseWriter, r *http.Request) {
+	summaries, err := h.reader.ListPapers(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, summaries)
 }
 
 func (h *ReadHandler) GetPaper(w http.ResponseWriter, r *http.Request) {

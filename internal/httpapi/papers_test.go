@@ -14,12 +14,14 @@ import (
 )
 
 type fakeReader struct {
-	job        papers.JobStatus
-	jobErr     error
-	paper      papers.PaperDetail
-	paperErr   error
-	gotJobID   uuid.UUID
-	gotPaperID uuid.UUID
+	job          papers.JobStatus
+	jobErr       error
+	paper        papers.PaperDetail
+	paperErr     error
+	summaries    []papers.PaperSummary
+	summariesErr error
+	gotJobID     uuid.UUID
+	gotPaperID   uuid.UUID
 }
 
 func (f *fakeReader) GetJob(ctx context.Context, jobID uuid.UUID) (papers.JobStatus, error) {
@@ -30,6 +32,10 @@ func (f *fakeReader) GetJob(ctx context.Context, jobID uuid.UUID) (papers.JobSta
 func (f *fakeReader) GetPaperDetail(ctx context.Context, paperID uuid.UUID) (papers.PaperDetail, error) {
 	f.gotPaperID = paperID
 	return f.paper, f.paperErr
+}
+
+func (f *fakeReader) ListPapers(ctx context.Context) ([]papers.PaperSummary, error) {
+	return f.summaries, f.summariesErr
 }
 
 func newTestServer(reader PaperReader) *httptest.Server {
@@ -133,6 +139,26 @@ func TestGetPaperReturnsDetail(t *testing.T) {
 	}
 	if len(got.Figures) != 1 || got.Figures[0].Label != "Figure 1" {
 		t.Fatalf("figures = %#v", got.Figures)
+	}
+}
+
+func TestListPapers(t *testing.T) {
+	title := "A Paper"
+	h := NewReadHandler(&fakeReader{summaries: []papers.PaperSummary{
+		{PaperID: uuid.New(), Title: &title, Status: "completed", UploadedFilename: "a.pdf"},
+	}})
+	req := httptest.NewRequest(http.MethodGet, "/v1/papers", nil)
+	rr := httptest.NewRecorder()
+	NewRouter(Dependencies{ReadHandler: h}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var got []papers.PaperSummary
+	if err := json.NewDecoder(rr.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got) != 1 || got[0].Status != "completed" {
+		t.Fatalf("summaries = %#v", got)
 	}
 }
 

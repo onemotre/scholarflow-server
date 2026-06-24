@@ -77,6 +77,15 @@ type FigureDTO struct {
 	Page    *int32 `json:"page,omitempty"`
 }
 
+type PaperSummary struct {
+	PaperID          uuid.UUID  `json:"paper_id"`
+	Title            *string    `json:"title,omitempty"`
+	Status           string     `json:"status"`
+	PublicationYear  *int32     `json:"publication_year,omitempty"`
+	UploadedFilename string     `json:"uploaded_filename"`
+	CreatedAt        *time.Time `json:"created_at,omitempty"`
+}
+
 type SQLReadRepository struct {
 	queries *db.Queries
 }
@@ -103,6 +112,25 @@ func (r *SQLReadRepository) GetJob(ctx context.Context, jobID uuid.UUID) (JobSta
 		UpdatedAt:    timestamp(job.UpdatedAt),
 		CompletedAt:  timestamp(job.CompletedAt),
 	}, nil
+}
+
+func (r *SQLReadRepository) ListPapers(ctx context.Context) ([]PaperSummary, error) {
+	rows, err := r.queries.ListPapers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make([]PaperSummary, 0, len(rows))
+	for _, row := range rows {
+		summaries = append(summaries, PaperSummary{
+			PaperID:          row.ID,
+			Title:            row.Title,
+			Status:           row.Status,
+			PublicationYear:  row.PublicationYear,
+			UploadedFilename: row.UploadedFilename,
+			CreatedAt:        timestamp(row.CreatedAt),
+		})
+	}
+	return summaries, nil
 }
 
 func (r *SQLReadRepository) GetPaperDetail(ctx context.Context, paperID uuid.UUID) (PaperDetail, error) {
