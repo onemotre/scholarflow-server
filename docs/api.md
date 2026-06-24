@@ -6,6 +6,7 @@
 - `POST /v1/uploads/papers`
 - `GET /v1/jobs/{id}`
 - `GET /v1/papers/{id}`
+- `GET /v1/papers/{id}/figures/{figureId}/image`
 
 ## Local Verification
 
@@ -69,6 +70,18 @@ Returns parsed paper metadata plus authors, sections, and references. `404` if t
 `doi`, `publication_year`, and `references` are populated only insofar as the parser extracts them from the PDF; the current GROBID adapter extracts title/abstract/authors/sections, so these may be empty for preprints.
 
 The response also includes a `figures` array (`label`, `kind` = `figure`|`table`, `caption`, `order`, `page`) extracted from the document. `doi`, `publication_year`, and `references` are populated when GROBID finds them in the PDF (preprints often have none).
+
+### GET /v1/papers/{id}/figures/{figureId}/image
+
+Streams the extracted PNG for a figure. `figureId` is the `id` from a figure in
+`GET /v1/papers/{id}`. Responses:
+
+- `200 OK` with `Content-Type: image/png` — the cropped figure image.
+- `404 Not Found` — the figure does not exist or has no extracted image.
+- `400 Bad Request` — malformed `id` or `figureId`.
+
+Each figure object in `GET /v1/papers/{id}` now includes `"id"` (UUID) and
+`"has_image"` (bool) so clients know which figures have an image to fetch.
 
 ## Worker Parse Pipeline
 
