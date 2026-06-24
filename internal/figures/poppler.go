@@ -8,7 +8,6 @@ import (
 	"image/draw"
 	"image/png"
 	"os"
-	"path/filepath"
 )
 
 // PopplerCropper renders a PDF page with pdftoppm and crops a figure region.
@@ -24,7 +23,16 @@ func NewPopplerCropper(paddingPct float64, maxDim int, workDir string) *PopplerC
 }
 
 func (c *PopplerCropper) Crop(ctx context.Context, pdfPath string, page int, rect Rect, dpi int) ([]byte, error) {
-	prefix := filepath.Join(c.workDir, fmt.Sprintf("sf-fig-%d-%d", page, os.Getpid()))
+	// Reserve a unique name in workDir so concurrent Crop calls (even on the same
+	// page) never share an output prefix. Remove the reservation file and reuse its
+	// name as the pdftoppm prefix, so pdftoppm writes exactly <prefix>.png.
+	tmp, err := os.CreateTemp(c.workDir, fmt.Sprintf("sf-fig-%d-*", page))
+	if err != nil {
+		return nil, fmt.Errorf("reserve work file: %w", err)
+	}
+	prefix := tmp.Name()
+	tmp.Close()
+	os.Remove(prefix)
 	// -singlefile makes pdftoppm write exactly <prefix>.png (no page-number suffix).
 	cmd := execCommand(ctx, c.binary,
 		"-png", "-singlefile",
