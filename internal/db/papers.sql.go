@@ -640,6 +640,49 @@ func (q *Queries) ListPaperSections(ctx context.Context, paperID uuid.UUID) ([]P
 	return items, nil
 }
 
+const listPapers = `-- name: ListPapers :many
+SELECT id, title, status, publication_year, uploaded_filename, created_at
+FROM papers
+ORDER BY created_at DESC
+LIMIT 500
+`
+
+type ListPapersRow struct {
+	ID               uuid.UUID
+	Title            *string
+	Status           string
+	PublicationYear  *int32
+	UploadedFilename string
+	CreatedAt        pgtype.Timestamptz
+}
+
+func (q *Queries) ListPapers(ctx context.Context) ([]ListPapersRow, error) {
+	rows, err := q.db.Query(ctx, listPapers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPapersRow
+	for rows.Next() {
+		var i ListPapersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Status,
+			&i.PublicationYear,
+			&i.UploadedFilename,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const resetFailedJob = `-- name: ResetFailedJob :execrows
 UPDATE paper_processing_jobs
 SET status = 'queued',

@@ -23,6 +23,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	if deps.ReadHandler != nil {
 		r.Get("/v1/jobs/{id}", deps.ReadHandler.GetJob)
+		r.Get("/v1/papers", deps.ReadHandler.ListPapers)
 		r.Get("/v1/papers/{id}", deps.ReadHandler.GetPaper)
 	}
 	if deps.RetryHandler != nil {
