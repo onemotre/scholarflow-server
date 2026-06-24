@@ -30,6 +30,7 @@ type PipelineRepository interface {
 	CreateTEIAsset(ctx context.Context, paperID uuid.UUID, asset storage.Object) error
 	SaveParsedPaper(ctx context.Context, paperID uuid.UUID, parsed parser.ParsedPaper) error
 	AttachFigureImage(ctx context.Context, paperID uuid.UUID, figureOrder int32, asset storage.Object) error
+	ClearFigureImages(ctx context.Context, paperID uuid.UUID) error
 }
 
 type ReadEnqueuer interface {
@@ -108,6 +109,9 @@ func (p *Pipeline) process(ctx context.Context, payload ProcessPaperPayload) err
 func (p *Pipeline) extractFigures(ctx context.Context, paperID uuid.UUID, pdfKey string, figs []parser.Figure) {
 	if p.cropper == nil {
 		return
+	}
+	if err := p.repo.ClearFigureImages(ctx, paperID); err != nil {
+		log.Printf("figure extract: clear prior images paper=%s: %v", paperID, err)
 	}
 	hasBox := false
 	for _, f := range figs {

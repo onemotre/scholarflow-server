@@ -21,15 +21,16 @@ type figureAttach struct {
 }
 
 type fakePipelineRepo struct {
-	statuses       []string
-	pdfAsset       storage.Object
-	teiAsset       storage.Object
-	saved          parser.ParsedPaper
-	failPDFAsset   error
-	failSaveParsed error
-	failStatus     error
-	attached       []figureAttach
-	failAttach     error
+	statuses            []string
+	pdfAsset            storage.Object
+	teiAsset            storage.Object
+	saved               parser.ParsedPaper
+	failPDFAsset        error
+	failSaveParsed      error
+	failStatus          error
+	attached            []figureAttach
+	failAttach          error
+	clearedFigureImages []uuid.UUID
 }
 
 func (r *fakePipelineRepo) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error {
@@ -65,6 +66,11 @@ func (r *fakePipelineRepo) AttachFigureImage(ctx context.Context, paperID uuid.U
 		return r.failAttach
 	}
 	r.attached = append(r.attached, figureAttach{order: figureOrder, asset: asset})
+	return nil
+}
+
+func (r *fakePipelineRepo) ClearFigureImages(ctx context.Context, paperID uuid.UUID) error {
+	r.clearedFigureImages = append(r.clearedFigureImages, paperID)
 	return nil
 }
 
@@ -168,6 +174,9 @@ func TestPipelineExtractsFigures(t *testing.T) {
 	}
 	if got := strings.Join(repo.statuses, ","); got != "processing,parsed" {
 		t.Fatalf("statuses = %s", got)
+	}
+	if len(repo.clearedFigureImages) != 1 || repo.clearedFigureImages[0] != paperID {
+		t.Fatalf("ClearFigureImages calls = %v, want exactly one call with paperID %s", repo.clearedFigureImages, paperID)
 	}
 }
 

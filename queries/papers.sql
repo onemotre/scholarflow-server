@@ -145,6 +145,11 @@ FROM papers
 ORDER BY created_at DESC
 LIMIT 500;
 
+-- name: DeletePaperFigureImageAssets :exec
+DELETE FROM paper_assets WHERE paper_id = $1 AND asset_type = 'figure-image';
+
+-- Matches a figure by (paper_id, figure_order). Relies on figure_order being
+-- unique per paper (the parser emits sequential orders); not DB-enforced.
 -- name: SetPaperFigureImageAsset :exec
 UPDATE paper_figures
 SET image_asset_id = sqlc.arg(image_asset_id)

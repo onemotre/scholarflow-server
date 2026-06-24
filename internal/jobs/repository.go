@@ -260,6 +260,13 @@ func intPointer(value *int) *int32 {
 	return &v
 }
 
+func (r *SQLRepository) ClearFigureImages(ctx context.Context, paperID uuid.UUID) error {
+	if err := r.queries.DeletePaperFigureImageAssets(ctx, paperID); err != nil {
+		return fmt.Errorf("delete paper figure image assets: %w", err)
+	}
+	return nil
+}
+
 func (r *SQLRepository) AttachFigureImage(ctx context.Context, paperID uuid.UUID, figureOrder int32, asset storage.Object) error {
 	created, err := r.queries.CreatePaperAsset(ctx, db.CreatePaperAssetParams{
 		PaperID:       paperID,

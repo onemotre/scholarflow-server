@@ -391,6 +391,15 @@ func (q *Queries) DeletePaperCardsByPaper(ctx context.Context, paperID uuid.UUID
 	return err
 }
 
+const deletePaperFigureImageAssets = `-- name: DeletePaperFigureImageAssets :exec
+DELETE FROM paper_assets WHERE paper_id = $1 AND asset_type = 'figure-image'
+`
+
+func (q *Queries) DeletePaperFigureImageAssets(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperFigureImageAssets, paperID)
+	return err
+}
+
 const deletePaperFiguresByPaper = `-- name: DeletePaperFiguresByPaper :exec
 DELETE FROM paper_figures WHERE paper_id = $1
 `
@@ -782,6 +791,8 @@ type SetPaperFigureImageAssetParams struct {
 	FigureOrder  int32
 }
 
+// Matches a figure by (paper_id, figure_order). Relies on figure_order being
+// unique per paper (the parser emits sequential orders); not DB-enforced.
 func (q *Queries) SetPaperFigureImageAsset(ctx context.Context, arg SetPaperFigureImageAssetParams) error {
 	_, err := q.db.Exec(ctx, setPaperFigureImageAsset, arg.ImageAssetID, arg.PaperID, arg.FigureOrder)
 	return err
