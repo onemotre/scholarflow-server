@@ -199,3 +199,30 @@ func TestParseTEIExtractsFigures(t *testing.T) {
 		t.Fatalf("Figure[1].Page = %v, want nil", f1.Page)
 	}
 }
+
+func TestParseBox(t *testing.T) {
+	tests := []struct {
+		name   string
+		coords string
+		want   *FigureBox
+	}{
+		{"empty", "", nil},
+		{"malformed", "abc", nil},
+		{"single", "3,10,20,30,40", &FigureBox{Page: 3, X: 10, Y: 20, W: 30, H: 40}},
+		{"union same page", "3,10,20,5,5;3,30,40,5,5", &FigureBox{Page: 3, X: 10, Y: 20, W: 25, H: 25}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseBox(tt.coords)
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("parseBox(%q) = %#v, want nil", tt.coords, got)
+				}
+				return
+			}
+			if got == nil || *got != *tt.want {
+				t.Fatalf("parseBox(%q) = %#v, want %#v", tt.coords, got, tt.want)
+			}
+		})
+	}
+}

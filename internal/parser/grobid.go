@@ -264,6 +264,7 @@ func parseTEI(raw []byte) (ParsedPaper, error) {
 			Label:   label,
 			Caption: strings.TrimSpace(fig.Desc),
 			Page:    parsePage(fig.Coords),
+			BBox:    parseBox(fig.Coords),
 		})
 	}
 	return parsed, nil
@@ -376,4 +377,65 @@ func parsePage(coords string) *int32 {
 	}
 	value := int32(page)
 	return &value
+}
+
+// parseBox unions the ";"-separated boxes in a GROBID @coords value into one
+// rect on the dominant page (the page carrying the largest-area box). Returns
+// nil when no box parses.
+func parseBox(coords string) *FigureBox {
+	coords = strings.TrimSpace(coords)
+	if coords == "" {
+		return nil
+	}
+	type box struct {
+		page                 int32
+		x0, y0, x1, y1, area float64
+	}
+	var boxes []box
+	for _, raw := range strings.Split(coords, ";") {
+		parts := strings.Split(strings.TrimSpace(raw), ",")
+		if len(parts) < 5 {
+			continue
+		}
+		page, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+		if err != nil || page <= 0 {
+			continue
+		}
+		x, errX := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		y, errY := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+		wv, errW := strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
+		hv, errH := strconv.ParseFloat(strings.TrimSpace(parts[4]), 64)
+		if errX != nil || errY != nil || errW != nil || errH != nil {
+			continue
+		}
+		boxes = append(boxes, box{page: int32(page), x0: x, y0: y, x1: x + wv, y1: y + hv, area: wv * hv})
+	}
+	if len(boxes) == 0 {
+		return nil
+	}
+	dom := boxes[0]
+	for _, b := range boxes[1:] {
+		if b.area > dom.area {
+			dom = b
+		}
+	}
+	minX, minY, maxX, maxY := dom.x0, dom.y0, dom.x1, dom.y1
+	for _, b := range boxes {
+		if b.page != dom.page {
+			continue
+		}
+		if b.x0 < minX {
+			minX = b.x0
+		}
+		if b.y0 < minY {
+			minY = b.y0
+		}
+		if b.x1 > maxX {
+			maxX = b.x1
+		}
+		if b.y1 > maxY {
+			maxY = b.y1
+		}
+	}
+	return &FigureBox{Page: dom.page, X: minX, Y: minY, W: maxX - minX, H: maxY - minY}
 }
