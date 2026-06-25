@@ -73,7 +73,7 @@ func TestReadPipelineCompletes(t *testing.T) {
 		Sections: []ReadSection{{ID: sectionID, Label: "1", Heading: "Intro", Text: "Body"}},
 		Figures:  []ReadFigure{{Label: "Figure 1", Kind: "figure", Caption: "cap"}},
 	}}
-	rdr := &fakeReader{card: reader.PaperCard{Background: "bg", Problem: "p", Method: "m", Implementation: "impl"}}
+	rdr := &fakeReader{card: reader.PaperCard{Introduction: "intro", Methodology: []reader.MethodologyItem{{Problem: "p", Method: "m"}}}}
 	pipe := NewReadPipeline(repo, rdr, "gpt-4o-mini")
 
 	err := pipe.ReadPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()}, 1, true)
@@ -83,8 +83,8 @@ func TestReadPipelineCompletes(t *testing.T) {
 	if got := strings.Join(repo.statuses, ","); got != "reading,completed" {
 		t.Fatalf("statuses = %s", got)
 	}
-	if repo.saved.Method != "m" {
-		t.Fatalf("saved method = %q", repo.saved.Method)
+	if len(repo.saved.Methodology) != 1 || repo.saved.Methodology[0].Method != "m" {
+		t.Fatalf("saved methodology = %#v", repo.saved.Methodology)
 	}
 	if repo.savedMap["1"] != sectionID {
 		t.Fatalf("label map = %#v", repo.savedMap)
@@ -109,13 +109,13 @@ func TestReadPipelineResolvesPages(t *testing.T) {
 	ev0 := 7 // out of [3,5] -> clamp to 5
 	ev1 := 4 // within range -> keep
 	rdr := &fakeReader{card: reader.PaperCard{
-		Background: "bg", Problem: "p", Method: "m", Implementation: "impl",
-		Results: []string{"r0"},
-		Figures: []reader.FigureRef{{Label: "figure 2", ClaimKey: "results", ClaimIndex: intPtr(0)}},
+		Introduction: "intro",
+		Results:      []reader.ResultItem{{Metric: "acc", Finding: "r0"}},
+		Figures:      []reader.FigureRef{{Label: "figure 2", ClaimKey: "results", ClaimIndex: intPtr(0)}},
 		Evidence: []reader.Evidence{
 			{ClaimKey: "results", SectionID: "1", Page: &ev0},
 			{ClaimKey: "results", SectionID: "1", Page: &ev1},
-			{ClaimKey: "method", SectionID: "999"}, // unknown section -> untouched
+			{ClaimKey: "methodology", SectionID: "999"}, // unknown section -> untouched
 		},
 	}}
 	pipe := NewReadPipeline(repo, rdr, "m")

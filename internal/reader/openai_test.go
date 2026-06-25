@@ -50,7 +50,7 @@ func sampleContext() Context {
 }
 
 func TestOpenAIReaderParsesCard(t *testing.T) {
-	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl","evidence":[{"claim_key":"method","evidence_type":"section","section_id":"1","confidence":0.8}]}`
+	card := `{"introduction":"intro","methodology":[{"problem":"p","method":"m"}],"evidence":[{"claim_key":"methodology","claim_index":0,"evidence_type":"section","section_id":"1","confidence":0.8}]}`
 	srv := newCardServer(t, card)
 	defer srv.Close()
 
@@ -58,8 +58,11 @@ func TestOpenAIReaderParsesCard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPaper error: %v", err)
 	}
-	if got.Method != "m" {
-		t.Fatalf("method = %q", got.Method)
+	if got.Introduction != "intro" {
+		t.Fatalf("introduction = %q", got.Introduction)
+	}
+	if len(got.Methodology) != 1 || got.Methodology[0].Method != "m" {
+		t.Fatalf("methodology = %#v", got.Methodology)
 	}
 	if len(got.Evidence) != 1 || got.Evidence[0].SectionID != "1" {
 		t.Fatalf("evidence = %#v", got.Evidence)
@@ -67,7 +70,7 @@ func TestOpenAIReaderParsesCard(t *testing.T) {
 }
 
 func TestOpenAIReaderRejectsLimitations(t *testing.T) {
-	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl","limitations":"nope"}`
+	card := `{"introduction":"intro","limitations":"nope"}`
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&calls, 1)
@@ -87,7 +90,7 @@ func TestOpenAIReaderRejectsLimitations(t *testing.T) {
 }
 
 func TestOpenAIReaderRetriesBadJSON(t *testing.T) {
-	good := `{"background":"bg","problem":"p","method":"m","implementation":"impl"}`
+	good := `{"introduction":"intro"}`
 	srv := newCardServer(t, "not json", good)
 	defer srv.Close()
 
@@ -95,13 +98,13 @@ func TestOpenAIReaderRetriesBadJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPaper error after retry: %v", err)
 	}
-	if got.Background != "bg" {
-		t.Fatalf("background = %q", got.Background)
+	if got.Introduction != "intro" {
+		t.Fatalf("introduction = %q", got.Introduction)
 	}
 }
 
 func TestResponsesStyleParsesCard(t *testing.T) {
-	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl"}`
+	card := `{"introduction":"intro"}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/responses" {
 			t.Errorf("path = %q, want /responses", r.URL.Path)
@@ -123,13 +126,13 @@ func TestResponsesStyleParsesCard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPaper error: %v", err)
 	}
-	if got.Background != "bg" {
-		t.Fatalf("background = %q", got.Background)
+	if got.Introduction != "intro" {
+		t.Fatalf("introduction = %q", got.Introduction)
 	}
 }
 
 func TestResponsesStyleHonorsOutputText(t *testing.T) {
-	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl"}`
+	card := `{"introduction":"intro"}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := map[string]any{"output_text": card, "output": []any{}}
 		w.Header().Set("Content-Type", "application/json")
@@ -146,13 +149,13 @@ func TestResponsesStyleHonorsOutputText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPaper error: %v", err)
 	}
-	if got.Background != "bg" {
-		t.Fatalf("background = %q (output_text fallback path did not yield the card)", got.Background)
+	if got.Introduction != "intro" {
+		t.Fatalf("introduction = %q (output_text fallback path did not yield the card)", got.Introduction)
 	}
 }
 
 func TestResponsesJSONSchemaRequestShape(t *testing.T) {
-	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl"}`
+	card := `{"introduction":"intro"}`
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
@@ -193,7 +196,7 @@ func TestResponsesJSONSchemaRequestShape(t *testing.T) {
 }
 
 func TestChatJSONSchemaRequestShape(t *testing.T) {
-	card := `{"background":"bg","problem":"p","method":"m","implementation":"impl"}`
+	card := `{"introduction":"intro"}`
 	var gotBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&gotBody)
