@@ -17,11 +17,16 @@ func NewSQLRepository(queries *db.Queries) *SQLRepository {
 	return &SQLRepository{queries: queries}
 }
 
-func (r *SQLRepository) CreatePaperUpload(ctx context.Context, filename string, asset storage.Object) (UploadResult, error) {
+func (r *SQLRepository) CreatePaperUpload(ctx context.Context, info SourceInfo, asset storage.Object) (UploadResult, error) {
 	paper, err := r.queries.CreatePaper(ctx, db.CreatePaperParams{
-		SourceType:       "local_pdf",
+		SourceType:       info.SourceType,
+		SourceID:         optString(info.SourceID),
 		Status:           "queued",
-		UploadedFilename: filename,
+		UploadedFilename: info.Filename,
+		Title:            optString(info.Title),
+		Abstract:         optString(info.Abstract),
+		Doi:              optString(info.DOI),
+		PublicationYear:  optInt32(info.Year),
 	})
 	if err != nil {
 		return UploadResult{}, err
@@ -54,4 +59,22 @@ func (r *SQLRepository) SetJobTaskID(ctx context.Context, jobID uuid.UUID, taskI
 		TaskID: &taskID,
 	})
 	return err
+}
+
+func (r *SQLRepository) GetPaperBySourceID(ctx context.Context, sourceID string) (bool, error) {
+	return r.queries.ExistsPaperBySource(ctx, optString(sourceID))
+}
+
+func optString(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func optInt32(v int32) *int32 {
+	if v == 0 {
+		return nil
+	}
+	return &v
 }
