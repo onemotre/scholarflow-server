@@ -33,6 +33,7 @@ type Affiliation struct {
 
 type Section struct {
 	Order     int32
+	Number    string // GROBID head @n (e.g. "2.1"); empty when unnumbered
 	Heading   string
 	Text      string
 	PageStart *int32

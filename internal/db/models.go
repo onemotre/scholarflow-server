@@ -125,12 +125,13 @@ type PaperReference struct {
 }
 
 type PaperSection struct {
-	ID           uuid.UUID
-	PaperID      uuid.UUID
-	SectionOrder int32
-	Heading      *string
-	Text         string
-	PageStart    *int32
-	PageEnd      *int32
-	GrobidPath   *string
+	ID            uuid.UUID
+	PaperID       uuid.UUID
+	SectionOrder  int32
+	Heading       *string
+	Text          string
+	PageStart     *int32
+	PageEnd       *int32
+	GrobidPath    *string
+	SectionNumber *string
 }

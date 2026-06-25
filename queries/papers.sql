@@ -65,8 +65,8 @@ RETURNING *;
 DELETE FROM paper_sections WHERE paper_id = $1;
 
 -- name: CreatePaperSection :one
-INSERT INTO paper_sections (paper_id, section_order, heading, text, page_start, page_end, grobid_path)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO paper_sections (paper_id, section_order, section_number, heading, text, page_start, page_end, grobid_path)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: DeletePaperReferences :exec

@@ -125,6 +125,50 @@ func TestParseTEIExtractsSectionPagesFromCoords(t *testing.T) {
 	}
 }
 
+func TestParseTEIExtractsDivWrappedAbstract(t *testing.T) {
+	// GROBID often wraps the abstract as <abstract><div><p>… rather than
+	// <abstract><p>…; both must be extracted.
+	tei := `<TEI><teiHeader><profileDesc><abstract><div><p>First para.</p><p>Second para.</p></div></abstract></profileDesc></teiHeader>
+	<text><body><div><head>Intro</head><p>x</p></div></body></text></TEI>`
+	parsed, err := parseTEI([]byte(tei))
+	if err != nil {
+		t.Fatalf("parseTEI error: %v", err)
+	}
+	if parsed.Abstract != "First para.\n\nSecond para." {
+		t.Fatalf("Abstract = %q", parsed.Abstract)
+	}
+}
+
+func TestParseTEICapturesSectionNumberAndKeepsHeadingOnly(t *testing.T) {
+	tei := `<TEI><text><body>
+	  <div><head n="2">Related Work</head></div>
+	  <div><head n="2.1">Motion Track</head><p>Tracking details.</p></div>
+	  <div><head>Plain</head><p>body</p></div>
+	  <div><p>orphan paragraph, no head</p></div>
+	</body></text></TEI>`
+	parsed, err := parseTEI([]byte(tei))
+	if err != nil {
+		t.Fatalf("parseTEI error: %v", err)
+	}
+	if len(parsed.Sections) != 4 {
+		t.Fatalf("Sections = %d, want 4: %#v", len(parsed.Sections), parsed.Sections)
+	}
+	// Heading-only parent section is retained with its number and empty text.
+	if s := parsed.Sections[0]; s.Number != "2" || s.Heading != "Related Work" || s.Text != "" {
+		t.Fatalf("Section[0] = %+v, want number=2 heading=Related Work text=empty", s)
+	}
+	if s := parsed.Sections[1]; s.Number != "2.1" || s.Heading != "Motion Track" {
+		t.Fatalf("Section[1] = %+v, want number=2.1 heading=Motion Track", s)
+	}
+	if s := parsed.Sections[2]; s.Number != "" || s.Heading != "Plain" {
+		t.Fatalf("Section[2] = %+v, want empty number heading=Plain", s)
+	}
+	// Div with neither heading nor text is still dropped.
+	if s := parsed.Sections[3]; s.Heading != "" || s.Text == "" {
+		t.Fatalf("Section[3] = %+v, want headless orphan kept by text", s)
+	}
+}
+
 func TestParsePDFRequestsTEICoordinates(t *testing.T) {
 	var gotCoords []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -293,25 +293,27 @@ func (q *Queries) CreatePaperReference(ctx context.Context, arg CreatePaperRefer
 }
 
 const createPaperSection = `-- name: CreatePaperSection :one
-INSERT INTO paper_sections (paper_id, section_order, heading, text, page_start, page_end, grobid_path)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, paper_id, section_order, heading, text, page_start, page_end, grobid_path
+INSERT INTO paper_sections (paper_id, section_order, section_number, heading, text, page_start, page_end, grobid_path)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, paper_id, section_order, heading, text, page_start, page_end, grobid_path, section_number
 `
 
 type CreatePaperSectionParams struct {
-	PaperID      uuid.UUID
-	SectionOrder int32
-	Heading      *string
-	Text         string
-	PageStart    *int32
-	PageEnd      *int32
-	GrobidPath   *string
+	PaperID       uuid.UUID
+	SectionOrder  int32
+	SectionNumber *string
+	Heading       *string
+	Text          string
+	PageStart     *int32
+	PageEnd       *int32
+	GrobidPath    *string
 }
 
 func (q *Queries) CreatePaperSection(ctx context.Context, arg CreatePaperSectionParams) (PaperSection, error) {
 	row := q.db.QueryRow(ctx, createPaperSection,
 		arg.PaperID,
 		arg.SectionOrder,
+		arg.SectionNumber,
 		arg.Heading,
 		arg.Text,
 		arg.PageStart,
@@ -328,6 +330,7 @@ func (q *Queries) CreatePaperSection(ctx context.Context, arg CreatePaperSection
 		&i.PageStart,
 		&i.PageEnd,
 		&i.GrobidPath,
+		&i.SectionNumber,
 	)
 	return i, err
 }
@@ -646,7 +649,7 @@ func (q *Queries) ListPaperReferences(ctx context.Context, paperID uuid.UUID) ([
 }
 
 const listPaperSections = `-- name: ListPaperSections :many
-SELECT id, paper_id, section_order, heading, text, page_start, page_end, grobid_path FROM paper_sections WHERE paper_id = $1 ORDER BY section_order
+SELECT id, paper_id, section_order, heading, text, page_start, page_end, grobid_path, section_number FROM paper_sections WHERE paper_id = $1 ORDER BY section_order
 `
 
 func (q *Queries) ListPaperSections(ctx context.Context, paperID uuid.UUID) ([]PaperSection, error) {
@@ -667,6 +670,7 @@ func (q *Queries) ListPaperSections(ctx context.Context, paperID uuid.UUID) ([]P
 			&i.PageStart,
 			&i.PageEnd,
 			&i.GrobidPath,
+			&i.SectionNumber,
 		); err != nil {
 			return nil, err
 		}

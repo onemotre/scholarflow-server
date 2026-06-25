@@ -53,6 +53,7 @@ type AuthorDTO struct {
 
 type SectionDTO struct {
 	Order     int32   `json:"order"`
+	Number    *string `json:"number,omitempty"`
 	Heading   *string `json:"heading,omitempty"`
 	Text      string  `json:"text"`
 	PageStart *int32  `json:"page_start,omitempty"`
@@ -181,6 +182,7 @@ func (r *SQLReadRepository) GetPaperDetail(ctx context.Context, paperID uuid.UUI
 	for _, s := range sections {
 		detail.Sections = append(detail.Sections, SectionDTO{
 			Order:     s.SectionOrder,
+			Number:    s.SectionNumber,
 			Heading:   s.Heading,
 			Text:      s.Text,
 			PageStart: s.PageStart,

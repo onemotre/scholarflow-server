@@ -139,7 +139,7 @@ func (c *fakeCropper) Crop(ctx context.Context, pdfPath string, page int, rect f
 
 func TestPipelineExtractsFigures(t *testing.T) {
 	paperID := uuid.New()
-	box := parser.FigureBox{Page: 2, X: 10, Y: 20, W: 30, H: 40}
+	box := parser.FigureBox{Page: 2, X: 10, Y: 20, W: 200, H: 150}
 	repo := &fakePipelineRepo{pdfAsset: storage.Object{Key: "papers/input.pdf"}}
 	store := &fakePipelineStore{pdf: "pdfdata"}
 	parserFake := &fakeParser{parsed: parser.ParsedPaper{
@@ -180,8 +180,33 @@ func TestPipelineExtractsFigures(t *testing.T) {
 	}
 }
 
+func TestPipelineSkipsDegenerateFigureBBox(t *testing.T) {
+	// GROBID sometimes reports only a caption-label sliver; cropping it yields a
+	// few-pixel garbage image, so the pipeline must skip it (no crop, no attach).
+	box := parser.FigureBox{Page: 1, X: 10, Y: 10, W: 12, H: 4}
+	repo := &fakePipelineRepo{pdfAsset: storage.Object{Key: "papers/input.pdf"}}
+	store := &fakePipelineStore{pdf: "pdfdata"}
+	parserFake := &fakeParser{parsed: parser.ParsedPaper{
+		Title:   "T",
+		RawTEI:  "<TEI/>",
+		Figures: []parser.Figure{{Order: 1, Kind: "figure", Label: "Figure 1", BBox: &box}},
+	}}
+	cropper := &fakeCropper{}
+	service := NewPipeline(repo, store, parserFake, nil, cropper, 150)
+
+	if err := service.ProcessPaper(context.Background(), ProcessPaperPayload{PaperID: uuid.New(), JobID: uuid.New()}); err != nil {
+		t.Fatalf("ProcessPaper error: %v", err)
+	}
+	if cropper.calls != 0 {
+		t.Fatalf("cropper calls = %d, want 0 (degenerate bbox skipped)", cropper.calls)
+	}
+	if len(repo.attached) != 0 {
+		t.Fatalf("attached = %#v, want none", repo.attached)
+	}
+}
+
 func TestPipelineFigureExtractIsBestEffort(t *testing.T) {
-	box := parser.FigureBox{Page: 1, X: 0, Y: 0, W: 10, H: 10}
+	box := parser.FigureBox{Page: 1, X: 0, Y: 0, W: 200, H: 150}
 	repo := &fakePipelineRepo{pdfAsset: storage.Object{Key: "papers/input.pdf"}}
 	store := &fakePipelineStore{pdf: "pdfdata"}
 	parserFake := &fakeParser{parsed: parser.ParsedPaper{

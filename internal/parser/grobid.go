@@ -169,8 +169,16 @@ type teiFigure struct {
 }
 
 type teiDiv struct {
-	Head       teiTextCoord   `xml:"head"`
+	Head       teiHead        `xml:"head"`
 	Paragraphs []teiTextCoord `xml:"p"`
+}
+
+// teiHead is a section head: its inner text plus the GROBID @n section number
+// (e.g. "2.1") that encodes the outline hierarchy.
+type teiHead struct {
+	Coords string `xml:"coords,attr"`
+	N      string `xml:"n,attr"`
+	Inner  string `xml:",innerxml"`
 }
 
 // teiTextCoord captures an element's inner text plus its @coords attribute.
@@ -181,8 +189,16 @@ type teiTextCoord struct {
 	Inner  string `xml:",innerxml"`
 }
 
+// teiParagraphs collects abstract paragraphs. GROBID emits the abstract either
+// as <abstract><p>… or wrapped as <abstract><div><p>…, so capture both shapes.
 type teiParagraphs struct {
-	Paragraphs []string `xml:"p"`
+	Paragraphs    []string `xml:"p"`
+	DivParagraphs []string `xml:"div>p"`
+}
+
+func (a teiParagraphs) text() string {
+	parts := append(append([]string{}, a.Paragraphs...), a.DivParagraphs...)
+	return strings.TrimSpace(strings.Join(parts, "\n\n"))
 }
 
 func parseTEI(raw []byte) (ParsedPaper, error) {
@@ -192,7 +208,7 @@ func parseTEI(raw []byte) (ParsedPaper, error) {
 	}
 	parsed := ParsedPaper{
 		Title:    strings.TrimSpace(doc.Header.FileDesc.TitleStmt.Title),
-		Abstract: strings.TrimSpace(strings.Join(doc.Header.ProfileDesc.Abstract.Paragraphs, "\n\n")),
+		Abstract: doc.Header.ProfileDesc.Abstract.text(),
 		RawTEI:   string(raw),
 	}
 	for i, author := range doc.Header.FileDesc.SourceDesc.Bibl.Analytic.Authors {
@@ -213,13 +229,18 @@ func parseTEI(raw []byte) (ParsedPaper, error) {
 			pages = appendCoordPages(pages, p.Coords)
 		}
 		text := strings.TrimSpace(strings.Join(paras, "\n\n"))
-		if text == "" {
+		heading := strings.TrimSpace(plainText(div.Head.Inner))
+		// Keep heading-only sections (parent headings whose body lives in
+		// subsections) so the outline hierarchy stays complete; drop only divs
+		// that carry neither a heading nor text.
+		if text == "" && heading == "" {
 			continue
 		}
 		start, end := pageRange(pages)
 		parsed.Sections = append(parsed.Sections, Section{
 			Order:     int32(i + 1),
-			Heading:   strings.TrimSpace(plainText(div.Head.Inner)),
+			Number:    strings.TrimSpace(div.Head.N),
+			Heading:   heading,
 			Text:      text,
 			PageStart: start,
 			PageEnd:   end,

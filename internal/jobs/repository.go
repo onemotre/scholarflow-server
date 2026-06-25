@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,13 +106,14 @@ func (r *SQLRepository) SaveParsedPaper(ctx context.Context, paperID uuid.UUID, 
 	}
 	for _, section := range parsed.Sections {
 		_, err := r.queries.CreatePaperSection(ctx, db.CreatePaperSectionParams{
-			PaperID:      paperID,
-			SectionOrder: section.Order,
-			Heading:      stringPointer(section.Heading),
-			Text:         section.Text,
-			PageStart:    section.PageStart,
-			PageEnd:      section.PageEnd,
-			GrobidPath:   stringPointer(section.Anchor),
+			PaperID:       paperID,
+			SectionOrder:  section.Order,
+			SectionNumber: stringPointer(section.Number),
+			Heading:       stringPointer(section.Heading),
+			Text:          section.Text,
+			PageStart:     section.PageStart,
+			PageEnd:       section.PageEnd,
+			GrobidPath:    stringPointer(section.Anchor),
 		})
 		if err != nil {
 			return fmt.Errorf("create paper section: %w", err)
@@ -191,10 +193,16 @@ func (r *SQLRepository) GetReadContext(ctx context.Context, paperID uuid.UUID) (
 	}
 	rc := ReadContext{Title: stringValue(paper.Title), Abstract: stringValue(paper.Abstract)}
 	for _, s := range sections {
+		// Prefix the GROBID @n number so the LLM sees the outline hierarchy
+		// (e.g. "2.1 Motion Track" rather than a flat "Motion Track").
+		heading := stringValue(s.Heading)
+		if num := stringValue(s.SectionNumber); num != "" {
+			heading = strings.TrimSpace(num + " " + heading)
+		}
 		rc.Sections = append(rc.Sections, ReadSection{
 			ID:        s.ID,
 			Label:     strconv.FormatInt(int64(s.SectionOrder), 10),
-			Heading:   stringValue(s.Heading),
+			Heading:   heading,
 			Text:      s.Text,
 			PageStart: s.PageStart,
 			PageEnd:   s.PageEnd,

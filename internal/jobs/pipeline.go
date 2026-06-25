@@ -24,6 +24,15 @@ const (
 	StatusFailed     = "failed"
 )
 
+// Minimum figure bounding-box size in PDF points. GROBID sometimes reports only
+// a figure's caption-label sliver (e.g. ~10x3 pt) instead of the graphic; cropping
+// those yields a few-pixel garbage image, so we skip them and leave the figure
+// without an extracted image rather than serve a broken crop.
+const (
+	minFigureWidthPt  = 40.0
+	minFigureHeightPt = 30.0
+)
+
 type PipelineRepository interface {
 	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error
 	GetPaperPDFAsset(ctx context.Context, paperID uuid.UUID) (storage.Object, error)
@@ -146,6 +155,10 @@ func (p *Pipeline) extractFigures(ctx context.Context, paperID uuid.UUID, pdfKey
 
 	for _, f := range figs {
 		if f.BBox == nil {
+			continue
+		}
+		if f.BBox.W < minFigureWidthPt || f.BBox.H < minFigureHeightPt {
+			log.Printf("figure extract: skip degenerate bbox paper=%s order=%d (%.1fx%.1f pt)", paperID, f.Order, f.BBox.W, f.BBox.H)
 			continue
 		}
 		img, err := p.cropper.Crop(ctx, tmp.Name(), int(f.BBox.Page),
