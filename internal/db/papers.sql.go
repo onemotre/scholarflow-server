@@ -24,19 +24,33 @@ func (q *Queries) CountPaperSections(ctx context.Context, paperID uuid.UUID) (in
 }
 
 const createPaper = `-- name: CreatePaper :one
-INSERT INTO papers (source_type, status, uploaded_filename)
-VALUES ($1, $2, $3)
-RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at
+INSERT INTO papers (source_type, source_id, status, uploaded_filename, title, abstract, doi, publication_year)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id
 `
 
 type CreatePaperParams struct {
 	SourceType       string
+	SourceID         *string
 	Status           string
 	UploadedFilename string
+	Title            *string
+	Abstract         *string
+	Doi              *string
+	PublicationYear  *int32
 }
 
 func (q *Queries) CreatePaper(ctx context.Context, arg CreatePaperParams) (Paper, error) {
-	row := q.db.QueryRow(ctx, createPaper, arg.SourceType, arg.Status, arg.UploadedFilename)
+	row := q.db.QueryRow(ctx, createPaper,
+		arg.SourceType,
+		arg.SourceID,
+		arg.Status,
+		arg.UploadedFilename,
+		arg.Title,
+		arg.Abstract,
+		arg.Doi,
+		arg.PublicationYear,
+	)
 	var i Paper
 	err := row.Scan(
 		&i.ID,
@@ -49,6 +63,7 @@ func (q *Queries) CreatePaper(ctx context.Context, arg CreatePaperParams) (Paper
 		&i.UploadedFilename,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SourceID,
 	)
 	return i, err
 }
@@ -430,6 +445,19 @@ func (q *Queries) DeletePaperSections(ctx context.Context, paperID uuid.UUID) er
 	return err
 }
 
+const existsPaperBySource = `-- name: ExistsPaperBySource :one
+SELECT EXISTS (
+    SELECT 1 FROM papers WHERE source_type = 'arxiv' AND source_id = $1
+)
+`
+
+func (q *Queries) ExistsPaperBySource(ctx context.Context, sourceID *string) (bool, error) {
+	row := q.db.QueryRow(ctx, existsPaperBySource, sourceID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getFigureImageAsset = `-- name: GetFigureImageAsset :one
 SELECT a.id, a.paper_id, a.asset_type, a.storage_bucket, a.storage_key, a.content_type, a.size_bytes, a.checksum, a.created_at
 FROM paper_figures f
@@ -478,7 +506,7 @@ func (q *Queries) GetLatestPaperCard(ctx context.Context, paperID uuid.UUID) (Pa
 }
 
 const getPaper = `-- name: GetPaper :one
-SELECT id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at FROM papers WHERE id = $1
+SELECT id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id FROM papers WHERE id = $1
 `
 
 func (q *Queries) GetPaper(ctx context.Context, id uuid.UUID) (Paper, error) {
@@ -495,6 +523,7 @@ func (q *Queries) GetPaper(ctx context.Context, id uuid.UUID) (Paper, error) {
 		&i.UploadedFilename,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SourceID,
 	)
 	return i, err
 }
@@ -841,7 +870,7 @@ SET title = $2,
     status = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at
+RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id
 `
 
 type UpdatePaperMetadataParams struct {
@@ -874,6 +903,7 @@ func (q *Queries) UpdatePaperMetadata(ctx context.Context, arg UpdatePaperMetada
 		&i.UploadedFilename,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SourceID,
 	)
 	return i, err
 }
