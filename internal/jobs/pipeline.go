@@ -1,12 +1,17 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
 	"strings"
 
 	"github.com/google/uuid"
 
+	"scholarflow_server/internal/figures"
 	"scholarflow_server/internal/parser"
 	"scholarflow_server/internal/storage"
 )
@@ -24,6 +29,8 @@ type PipelineRepository interface {
 	GetPaperPDFAsset(ctx context.Context, paperID uuid.UUID) (storage.Object, error)
 	CreateTEIAsset(ctx context.Context, paperID uuid.UUID, asset storage.Object) error
 	SaveParsedPaper(ctx context.Context, paperID uuid.UUID, parsed parser.ParsedPaper) error
+	AttachFigureImage(ctx context.Context, paperID uuid.UUID, figureOrder int32, asset storage.Object) error
+	ClearFigureImages(ctx context.Context, paperID uuid.UUID) error
 }
 
 type ReadEnqueuer interface {
@@ -35,10 +42,12 @@ type Pipeline struct {
 	store        storage.Store
 	parser       parser.Parser
 	readEnqueuer ReadEnqueuer
+	cropper      figures.Cropper
+	figDPI       int
 }
 
-func NewPipeline(repo PipelineRepository, store storage.Store, parser parser.Parser, readEnqueuer ReadEnqueuer) *Pipeline {
-	return &Pipeline{repo: repo, store: store, parser: parser, readEnqueuer: readEnqueuer}
+func NewPipeline(repo PipelineRepository, store storage.Store, parser parser.Parser, readEnqueuer ReadEnqueuer, cropper figures.Cropper, figDPI int) *Pipeline {
+	return &Pipeline{repo: repo, store: store, parser: parser, readEnqueuer: readEnqueuer, cropper: cropper, figDPI: figDPI}
 }
 
 func (p *Pipeline) ProcessPaper(ctx context.Context, payload ProcessPaperPayload) error {
@@ -90,5 +99,70 @@ func (p *Pipeline) process(ctx context.Context, payload ProcessPaperPayload) err
 	if err := p.repo.SaveParsedPaper(ctx, payload.PaperID, parsed); err != nil {
 		return fmt.Errorf("save parsed paper: %w", err)
 	}
+	p.extractFigures(ctx, payload.PaperID, pdfAsset.Key, parsed.Figures)
 	return nil
+}
+
+// extractFigures crops each figure with a bounding box out of the PDF and links
+// the resulting image. It is best-effort: every failure is logged and skipped so
+// the parse job is never affected.
+func (p *Pipeline) extractFigures(ctx context.Context, paperID uuid.UUID, pdfKey string, figs []parser.Figure) {
+	if p.cropper == nil {
+		return
+	}
+	if err := p.repo.ClearFigureImages(ctx, paperID); err != nil {
+		log.Printf("figure extract: clear prior images paper=%s: %v", paperID, err)
+	}
+	hasBox := false
+	for _, f := range figs {
+		if f.BBox != nil {
+			hasBox = true
+			break
+		}
+	}
+	if !hasBox {
+		return
+	}
+	// The original PDF reader was consumed by ParsePDF, so re-fetch it and write
+	// it to a temp file that pdftoppm can open.
+	rc, err := p.store.Get(ctx, pdfKey)
+	if err != nil {
+		log.Printf("figure extract: get pdf paper=%s: %v", paperID, err)
+		return
+	}
+	defer rc.Close()
+	tmp, err := os.CreateTemp("", "scholarflow-*.pdf")
+	if err != nil {
+		log.Printf("figure extract: temp file paper=%s: %v", paperID, err)
+		return
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := io.Copy(tmp, rc); err != nil {
+		tmp.Close()
+		log.Printf("figure extract: copy pdf paper=%s: %v", paperID, err)
+		return
+	}
+	tmp.Close()
+
+	for _, f := range figs {
+		if f.BBox == nil {
+			continue
+		}
+		img, err := p.cropper.Crop(ctx, tmp.Name(), int(f.BBox.Page),
+			figures.Rect{X: f.BBox.X, Y: f.BBox.Y, W: f.BBox.W, H: f.BBox.H}, p.figDPI)
+		if err != nil {
+			log.Printf("figure extract: crop paper=%s order=%d: %v", paperID, f.Order, err)
+			continue
+		}
+		key := fmt.Sprintf("papers/%s/figures/%d.png", paperID.String(), f.Order)
+		obj, err := p.store.Put(ctx, key, bytes.NewReader(img), int64(len(img)), "image/png")
+		if err != nil {
+			log.Printf("figure extract: put paper=%s order=%d: %v", paperID, f.Order, err)
+			continue
+		}
+		if err := p.repo.AttachFigureImage(ctx, paperID, f.Order, obj); err != nil {
+			log.Printf("figure extract: attach paper=%s order=%d: %v", paperID, f.Order, err)
+			continue
+		}
+	}
 }

@@ -70,11 +70,13 @@ type ReferenceDTO struct {
 }
 
 type FigureDTO struct {
-	Label   string `json:"label"`
-	Kind    string `json:"kind"`
-	Caption string `json:"caption"`
-	Order   int32  `json:"order"`
-	Page    *int32 `json:"page,omitempty"`
+	ID       uuid.UUID `json:"id"`
+	Label    string    `json:"label"`
+	Kind     string    `json:"kind"`
+	Caption  string    `json:"caption"`
+	Order    int32     `json:"order"`
+	Page     *int32    `json:"page,omitempty"`
+	HasImage bool      `json:"has_image"`
 }
 
 type PaperSummary struct {
@@ -207,11 +209,13 @@ func (r *SQLReadRepository) GetPaperDetail(ctx context.Context, paperID uuid.UUI
 	detail.Figures = make([]FigureDTO, 0, len(figures))
 	for _, f := range figures {
 		detail.Figures = append(detail.Figures, FigureDTO{
-			Label:   f.Label,
-			Kind:    f.Kind,
-			Caption: f.Caption,
-			Order:   f.FigureOrder,
-			Page:    f.Page,
+			ID:       f.ID,
+			Label:    f.Label,
+			Kind:     f.Kind,
+			Caption:  f.Caption,
+			Order:    f.FigureOrder,
+			Page:     f.Page,
+			HasImage: f.ImageAssetID.Valid,
 		})
 	}
 	card, err := r.queries.GetLatestPaperCard(ctx, paperID)
@@ -237,6 +241,20 @@ func (r *SQLReadRepository) SetJobTaskID(ctx context.Context, jobID uuid.UUID, t
 		TaskID: &taskID,
 	})
 	return err
+}
+
+func (r *SQLReadRepository) GetFigureImageKey(ctx context.Context, paperID, figureID uuid.UUID) (string, error) {
+	asset, err := r.queries.GetFigureImageAsset(ctx, db.GetFigureImageAssetParams{
+		FigureID: figureID,
+		PaperID:  paperID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", err
+	}
+	return asset.StorageKey, nil
 }
 
 func timestamp(ts pgtype.Timestamptz) *time.Time {

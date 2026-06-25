@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/hibiken/asynq"
 
 	"scholarflow_server/internal/config"
 	dbpkg "scholarflow_server/internal/db"
+	"scholarflow_server/internal/figures"
 	"scholarflow_server/internal/jobs"
 	"scholarflow_server/internal/migrate"
 	"scholarflow_server/internal/parser"
@@ -68,7 +70,11 @@ func main() {
 		log.Printf("reader disabled (OPENAI_BASE_URL / OPENAI_API_KEY not set); jobs stop at parsed")
 	}
 
-	pipeline := jobs.NewPipeline(repo, store, parser.NewGROBIDParser(cfg.GROBIDURL), readEnqueuer)
+	var cropper figures.Cropper
+	if cfg.FigureExtractEnabled {
+		cropper = figures.NewPopplerCropper(float64(cfg.FigureExtractPaddingPct), cfg.FigureExtractMaxDim, os.TempDir())
+	}
+	pipeline := jobs.NewPipeline(repo, store, parser.NewGROBIDParser(cfg.GROBIDURL), readEnqueuer, cropper, cfg.FigureExtractDPI)
 	jobs.NewProcessor(pipeline).Register(mux)
 
 	jobs.NewCleanupProcessor(repo, cfg.JobFailedRetentionDays).Register(mux)

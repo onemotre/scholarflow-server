@@ -202,3 +202,13 @@ docker compose up -d --build api worker
 
 - [ ] arxiv 自动化论文获取
 - [ ] LLM 翻译接口
+
+## 致谢 / Acknowledgements 🙏
+
+本项目依赖以下开源工具：
+
+- [GROBID](https://github.com/kermitt2/grobid) — scholarly PDF 解析为 TEI XML
+- [Poppler](https://poppler.freedesktop.org/) (`pdftoppm`) — 渲染 PDF 页面以裁剪图表/系统架构图
+- [asynq](https://github.com/hibiken/asynq) — Redis 异步任务队列
+- [sqlc](https://sqlc.dev/) — 从 SQL 生成类型安全的 Go 数据访问代码
+- [goose](https://github.com/pressly/goose) — 数据库迁移

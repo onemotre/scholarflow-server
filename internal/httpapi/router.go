@@ -7,9 +7,10 @@ import (
 )
 
 type Dependencies struct {
-	UploadHandler *UploadHandler
-	ReadHandler   *ReadHandler
-	RetryHandler  *RetryHandler
+	UploadHandler      *UploadHandler
+	ReadHandler        *ReadHandler
+	RetryHandler       *RetryHandler
+	FigureImageHandler *FigureImageHandler
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -28,6 +29,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	if deps.RetryHandler != nil {
 		r.Post("/v1/jobs/{id}/retry", deps.RetryHandler.Retry)
+	}
+	if deps.FigureImageHandler != nil {
+		r.Get("/v1/papers/{id}/figures/{figureId}/image", deps.FigureImageHandler.GetFigureImage)
 	}
 	return r
 }

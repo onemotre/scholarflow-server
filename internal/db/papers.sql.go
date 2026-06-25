@@ -391,6 +391,15 @@ func (q *Queries) DeletePaperCardsByPaper(ctx context.Context, paperID uuid.UUID
 	return err
 }
 
+const deletePaperFigureImageAssets = `-- name: DeletePaperFigureImageAssets :exec
+DELETE FROM paper_assets WHERE paper_id = $1 AND asset_type = 'figure-image'
+`
+
+func (q *Queries) DeletePaperFigureImageAssets(ctx context.Context, paperID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePaperFigureImageAssets, paperID)
+	return err
+}
+
 const deletePaperFiguresByPaper = `-- name: DeletePaperFiguresByPaper :exec
 DELETE FROM paper_figures WHERE paper_id = $1
 `
@@ -416,6 +425,35 @@ DELETE FROM paper_sections WHERE paper_id = $1
 func (q *Queries) DeletePaperSections(ctx context.Context, paperID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deletePaperSections, paperID)
 	return err
+}
+
+const getFigureImageAsset = `-- name: GetFigureImageAsset :one
+SELECT a.id, a.paper_id, a.asset_type, a.storage_bucket, a.storage_key, a.content_type, a.size_bytes, a.checksum, a.created_at
+FROM paper_figures f
+JOIN paper_assets a ON a.id = f.image_asset_id
+WHERE f.id = $1 AND f.paper_id = $2
+`
+
+type GetFigureImageAssetParams struct {
+	FigureID uuid.UUID
+	PaperID  uuid.UUID
+}
+
+func (q *Queries) GetFigureImageAsset(ctx context.Context, arg GetFigureImageAssetParams) (PaperAsset, error) {
+	row := q.db.QueryRow(ctx, getFigureImageAsset, arg.FigureID, arg.PaperID)
+	var i PaperAsset
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.AssetType,
+		&i.StorageBucket,
+		&i.StorageKey,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Checksum,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getLatestPaperCard = `-- name: GetLatestPaperCard :one
@@ -739,6 +777,25 @@ func (q *Queries) SetJobStatusAndAttempt(ctx context.Context, arg SetJobStatusAn
 		&i.CompletedAt,
 	)
 	return i, err
+}
+
+const setPaperFigureImageAsset = `-- name: SetPaperFigureImageAsset :exec
+UPDATE paper_figures
+SET image_asset_id = $1
+WHERE paper_id = $2 AND figure_order = $3
+`
+
+type SetPaperFigureImageAssetParams struct {
+	ImageAssetID pgtype.UUID
+	PaperID      uuid.UUID
+	FigureOrder  int32
+}
+
+// Matches a figure by (paper_id, figure_order). Relies on figure_order being
+// unique per paper (the parser emits sequential orders); not DB-enforced.
+func (q *Queries) SetPaperFigureImageAsset(ctx context.Context, arg SetPaperFigureImageAssetParams) error {
+	_, err := q.db.Exec(ctx, setPaperFigureImageAsset, arg.ImageAssetID, arg.PaperID, arg.FigureOrder)
+	return err
 }
 
 const setProcessingJobTaskID = `-- name: SetProcessingJobTaskID :one

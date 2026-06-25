@@ -50,12 +50,18 @@ type Reference struct {
 	RawText string
 }
 
+type FigureBox struct {
+	Page       int32
+	X, Y, W, H float64
+}
+
 type Figure struct {
 	Order   int32
 	Kind    string
 	Label   string
 	Caption string
 	Page    *int32
+	BBox    *FigureBox // nil when GROBID emitted no usable coords
 }
 
 type Parser interface {
