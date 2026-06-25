@@ -12,7 +12,7 @@ import (
 	"scholarflow_server/internal/reader"
 )
 
-const cardSchemaVersion = "2.0"
+const cardSchemaVersion = "3.0"
 
 type ReadSection struct {
 	ID        uuid.UUID
