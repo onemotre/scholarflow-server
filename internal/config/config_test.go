@@ -52,7 +52,7 @@ func TestLoadOpenAIDefaults(t *testing.T) {
 }
 
 func TestLoadArxivDefaults(t *testing.T) {
-	for _, k := range []string{"ARXIV_HARVEST_ENABLED", "ARXIV_HARVEST_CATEGORIES", "ARXIV_HARVEST_CRON", "ARXIV_HARVEST_MAX_RESULTS"} {
+	for _, k := range []string{"ARXIV_HARVEST_ENABLED", "ARXIV_HARVEST_CATEGORIES", "ARXIV_HARVEST_CRON", "ARXIV_HARVEST_MAX_RESULTS", "ARXIV_API_BASE_URL", "ARXIV_REQUEST_DELAY_SECONDS"} {
 		t.Setenv(k, "")
 	}
 	cfg := Load()
@@ -90,6 +90,20 @@ func TestLoadArxivCategoriesParsed(t *testing.T) {
 	for i, c := range want {
 		if cfg.ArxivHarvestCategories[i] != c {
 			t.Fatalf("categories[%d] = %q, want %q (trimmed)", i, cfg.ArxivHarvestCategories[i], c)
+		}
+	}
+}
+
+func TestEnvCSVEmptyDrop(t *testing.T) {
+	t.Setenv("ARXIV_HARVEST_CATEGORIES", "cs.CL,,cs.AI ,")
+	cfg := Load()
+	want := []string{"cs.CL", "cs.AI"}
+	if len(cfg.ArxivHarvestCategories) != len(want) {
+		t.Fatalf("categories = %#v, want %v", cfg.ArxivHarvestCategories, want)
+	}
+	for i, c := range want {
+		if cfg.ArxivHarvestCategories[i] != c {
+			t.Fatalf("categories[%d] = %q, want %q", i, cfg.ArxivHarvestCategories[i], c)
 		}
 	}
 }

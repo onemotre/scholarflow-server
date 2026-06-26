@@ -1,9 +1,12 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -73,8 +76,8 @@ func TestHarvestIngestsNewDedupsKnown(t *testing.T) {
 		},
 	}}
 	ing := &fakeIngester{existing: map[string]bool{"2301.00002": true}}
-	fetch := &fakeFetcher{data: map[string][]byte{"u1": []byte("PDF1")}}
-	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, ing, fetch)
+	fetch := &fakeFetcher{data: map[string][]byte{"u1": []byte("%PDF-1.4 content")}}
+	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing, fetch)
 
 	if err := h.Harvest(context.Background()); err != nil {
 		t.Fatalf("Harvest error: %v", err)
@@ -97,14 +100,19 @@ func TestHarvestIsBestEffortPerEntry(t *testing.T) {
 			{SourceID: "a", PDFURL: "ua"},
 			{SourceID: "b", PDFURL: "ub"}, // download fails
 			{SourceID: "c", PDFURL: "uc"},
+			{SourceID: "d", PDFURL: "ud"}, // non-PDF body — should be skipped
 		},
 	}}
 	ing := &fakeIngester{existing: map[string]bool{}}
 	fetch := &fakeFetcher{
-		data: map[string][]byte{"ua": []byte("A"), "uc": []byte("C")},
-		err:  map[string]error{"ub": errors.New("404")},
+		data: map[string][]byte{
+			"ua": []byte("%PDF-A"),
+			"uc": []byte("%PDF-C"),
+			"ud": []byte("<html>not a pdf</html>"),
+		},
+		err: map[string]error{"ub": errors.New("404")},
 	}
-	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, ing, fetch)
+	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing, fetch)
 
 	if err := h.Harvest(context.Background()); err != nil {
 		t.Fatalf("Harvest should not fail on one bad entry: %v", err)
@@ -119,12 +127,49 @@ func TestHarvestContinuesOnCategoryFetchError(t *testing.T) {
 	src := &fakeSource{name: "arxiv", err: errors.New("arxiv 503")}
 	ing := &fakeIngester{existing: map[string]bool{}}
 	fetch := &fakeFetcher{}
-	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL", "cs.AI"}, 25, ing, fetch)
+	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL", "cs.AI"}, 25, 0, ing, fetch)
 
 	if err := h.Harvest(context.Background()); err != nil {
 		t.Fatalf("Harvest should swallow fetch errors: %v", err)
 	}
 	if len(ing.ingested) != 0 {
 		t.Fatalf("ingested = %v, want none", sourceIDs(ing.ingested))
+	}
+}
+
+func TestHTTPPDFFetcherRejectsOversize(t *testing.T) {
+	oversizeBody := bytes.Repeat([]byte("x"), 1024)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(oversizeBody)
+	}))
+	defer srv.Close()
+
+	f := NewHTTPPDFFetcher(5*time.Second, 100)
+	_, err := f.Fetch(context.Background(), srv.URL)
+	if err == nil {
+		t.Fatal("expected error for oversize body, got nil")
+	}
+
+	// Body within limit succeeds.
+	smallBody := []byte("small")
+	srv2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(smallBody)
+	}))
+	defer srv2.Close()
+
+	f2 := NewHTTPPDFFetcher(5*time.Second, 100)
+	data, err := f2.Fetch(context.Background(), srv2.URL)
+	if err != nil {
+		t.Fatalf("expected no error for small body, got: %v", err)
+	}
+	if string(data) != "small" {
+		t.Fatalf("data = %q, want %q", data, "small")
+	}
+}
+
+func TestFilenameFlattening(t *testing.T) {
+	e := sources.Entry{SourceID: "cond-mat/0211034"}
+	if got := filenameForEntry(e); got != "cond-mat_0211034.pdf" {
+		t.Fatalf("filenameForEntry = %q, want cond-mat_0211034.pdf", got)
 	}
 }

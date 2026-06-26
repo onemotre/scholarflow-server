@@ -69,7 +69,7 @@ func TestFetchRecentParsesFeed(t *testing.T) {
 	if e.PDFURL != "http://arxiv.org/pdf/2301.00001v2" {
 		t.Fatalf("PDFURL = %q", e.PDFURL)
 	}
-	for _, want := range []string{"max_results=25", "search_query=cat%3Acs.CL", "sortBy=submittedDate"} {
+	for _, want := range []string{"max_results=25", "search_query=cat%3Acs.CL", "sortBy=submittedDate", "sortOrder=descending"} {
 		if !strings.Contains(gotQuery, want) {
 			t.Fatalf("query %q missing %q", gotQuery, want)
 		}

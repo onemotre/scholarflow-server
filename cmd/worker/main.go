@@ -93,11 +93,12 @@ func main() {
 		ingestService := papers.NewService(papersRepo, store, processEnqueuer)
 
 		arxivClient := arxiv.NewClient(cfg.ArxivAPIBaseURL, time.Duration(cfg.ArxivRequestDelaySeconds)*time.Second)
-		fetcher := jobs.NewHTTPPDFFetcher(120 * time.Second)
+		fetcher := jobs.NewHTTPPDFFetcher(120*time.Second, cfg.MaxUploadBytes)
 		harvestPipeline := jobs.NewHarvestPipeline(
 			[]sources.Source{arxivClient},
 			cfg.ArxivHarvestCategories,
 			cfg.ArxivHarvestMaxResults,
+			time.Duration(cfg.ArxivRequestDelaySeconds)*time.Second,
 			ingestService,
 			fetcher,
 		)
