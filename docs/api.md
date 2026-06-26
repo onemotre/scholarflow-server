@@ -9,6 +9,24 @@
 - `GET /v1/papers/{id}/figures/{figureId}/image`
 - `POST /v1/harvest/arxiv`
 
+## Authentication
+
+The three write endpoints — `POST /v1/uploads/papers`, `POST /v1/jobs/{id}/retry`,
+and `POST /v1/harvest/arxiv` — require a bearer token when `WRITE_API_TOKEN` is
+configured on the server. Send it as:
+
+    Authorization: Bearer <WRITE_API_TOKEN>
+
+A missing or incorrect token returns `401 unauthorized`. When `WRITE_API_TOKEN`
+is blank (default), auth is disabled and these endpoints are open. Read endpoints
+and `GET /healthz` are always public.
+
+Example:
+
+    curl -X POST http://localhost:8080/v1/uploads/papers \
+      -H "Authorization: Bearer $WRITE_API_TOKEN" \
+      -F file=@paper.pdf
+
 ## Local Verification
 
 Start dependencies and services:

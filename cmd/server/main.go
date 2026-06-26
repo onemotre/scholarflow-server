@@ -59,6 +59,7 @@ func main() {
 		RetryHandler:       retryHandler,
 		FigureImageHandler: figureImageHandler,
 		HarvestHandler:     harvestHandler,
+		WriteAPIToken:      cfg.WriteAPIToken,
 	})); err != nil {
 		log.Fatal(err)
 	}
