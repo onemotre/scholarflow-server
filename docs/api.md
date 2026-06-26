@@ -5,6 +5,7 @@
 - `GET /healthz`
 - `POST /v1/uploads/papers`
 - `GET /v1/jobs/{id}`
+- `POST /v1/jobs/{id}/retry`
 - `GET /v1/papers/{id}`
 - `GET /v1/papers/{id}/figures/{figureId}/image`
 - `POST /v1/harvest/arxiv`

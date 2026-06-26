@@ -6,9 +6,7 @@ import (
 	"testing"
 )
 
-// newTestRouter builds a router with non-nil handlers is overkill here; instead
-// we exercise the public/protected split by checking status codes. Reads must
-// stay open; writes must be gated when a token is set.
+// doReq issues one request against h and returns the status code.
 func doReq(t *testing.T, h http.Handler, method, path, auth string) int {
 	t.Helper()
 	req := httptest.NewRequest(method, path, nil)
@@ -31,5 +29,11 @@ func TestRouterAuthSplit(t *testing.T) {
 	// route, so an unauthenticated write must be 401, not 404.
 	if code := doReq(t, h, http.MethodPost, "/v1/uploads/papers", ""); code != http.StatusUnauthorized {
 		t.Fatalf("unauth upload = %d, want 401", code)
+	}
+	if code := doReq(t, h, http.MethodPost, "/v1/jobs/abc/retry", ""); code != http.StatusUnauthorized {
+		t.Fatalf("unauth retry = %d, want 401", code)
+	}
+	if code := doReq(t, h, http.MethodPost, "/v1/harvest/arxiv", ""); code != http.StatusUnauthorized {
+		t.Fatalf("unauth harvest = %d, want 401", code)
 	}
 }
