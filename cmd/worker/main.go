@@ -4,17 +4,21 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hibiken/asynq"
 
+	"scholarflow_server/internal/arxiv"
 	"scholarflow_server/internal/config"
 	dbpkg "scholarflow_server/internal/db"
 	"scholarflow_server/internal/figures"
 	"scholarflow_server/internal/jobs"
 	"scholarflow_server/internal/migrate"
+	"scholarflow_server/internal/papers"
 	"scholarflow_server/internal/parser"
 	"scholarflow_server/internal/reader"
+	"scholarflow_server/internal/sources"
 	"scholarflow_server/internal/storage"
 )
 
@@ -79,6 +83,29 @@ func main() {
 
 	jobs.NewCleanupProcessor(repo, cfg.JobFailedRetentionDays).Register(mux)
 
+	// arXiv daily harvest (opt-in). Registers an arxiv:harvest processor and a
+	// scheduler cron; downloads new papers and feeds them into the normal pipeline.
+	if cfg.ArxivHarvestEnabled && len(cfg.ArxivHarvestCategories) > 0 {
+		harvestClient := asynq.NewClient(redisOpt)
+		defer harvestClient.Close()
+		processEnqueuer := jobs.NewEnqueuer(harvestClient, cfg.ReadMaxRetry)
+		papersRepo := papers.NewSQLRepository(dbpkg.New(pool))
+		ingestService := papers.NewService(papersRepo, store, processEnqueuer)
+
+		arxivClient := arxiv.NewClient(cfg.ArxivAPIBaseURL, time.Duration(cfg.ArxivRequestDelaySeconds)*time.Second)
+		fetcher := jobs.NewHTTPPDFFetcher(120 * time.Second)
+		harvestPipeline := jobs.NewHarvestPipeline(
+			[]sources.Source{arxivClient},
+			cfg.ArxivHarvestCategories,
+			cfg.ArxivHarvestMaxResults,
+			ingestService,
+			fetcher,
+		)
+		jobs.NewHarvestProcessor(harvestPipeline).Register(mux)
+		log.Printf("arxiv harvest enabled categories=%s cron=%s max_results=%d",
+			strings.Join(cfg.ArxivHarvestCategories, ","), cfg.ArxivHarvestCron, cfg.ArxivHarvestMaxResults)
+	}
+
 	server := asynq.NewServer(redisOpt, asynq.Config{Concurrency: 2})
 
 	scheduler := asynq.NewScheduler(redisOpt, &asynq.SchedulerOpts{})
@@ -88,6 +115,15 @@ func main() {
 	}
 	if _, err := scheduler.Register(cfg.JobCleanupCron, cleanupTask); err != nil {
 		log.Fatal(err)
+	}
+	if cfg.ArxivHarvestEnabled && len(cfg.ArxivHarvestCategories) > 0 {
+		harvestTask, err := jobs.NewHarvestArxivTask()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if _, err := scheduler.Register(cfg.ArxivHarvestCron, harvestTask); err != nil {
+			log.Fatal(err)
+		}
 	}
 	if err := scheduler.Start(); err != nil {
 		log.Fatal(err)
