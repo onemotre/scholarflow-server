@@ -37,6 +37,16 @@ func NewCleanupJobsTask() (*asynq.Task, error) {
 	return asynq.NewTask(TypeCleanupJobs, nil), nil
 }
 
-func NewHarvestArxivTask() (*asynq.Task, error) {
-	return asynq.NewTask(TypeHarvestArxiv, nil), nil
+// HarvestArxivPayload optionally overrides which categories a harvest run uses.
+// An empty Categories slice means "use the worker's configured categories".
+type HarvestArxivPayload struct {
+	Categories []string `json:"categories,omitempty"`
+}
+
+func NewHarvestArxivTask(categories []string) (*asynq.Task, error) {
+	payload, err := json.Marshal(HarvestArxivPayload{Categories: categories})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(TypeHarvestArxiv, payload), nil
 }

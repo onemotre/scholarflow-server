@@ -83,9 +83,11 @@ func main() {
 
 	jobs.NewCleanupProcessor(repo, cfg.JobFailedRetentionDays).Register(mux)
 
-	// arXiv daily harvest (opt-in). Registers an arxiv:harvest processor and a
-	// scheduler cron; downloads new papers and feeds them into the normal pipeline.
-	if cfg.ArxivHarvestEnabled && len(cfg.ArxivHarvestCategories) > 0 {
+	// arXiv harvest. The processor is registered whenever harvest is enabled OR
+	// categories are configured, so the manual-trigger API works even when the
+	// daily cron is off. The scheduled cron itself is registered below, gated on
+	// ARXIV_HARVEST_ENABLED.
+	if cfg.ArxivHarvestEnabled || len(cfg.ArxivHarvestCategories) > 0 {
 		harvestClient := asynq.NewClient(redisOpt)
 		defer harvestClient.Close()
 		processEnqueuer := jobs.NewEnqueuer(harvestClient, cfg.ReadMaxRetry)
@@ -103,13 +105,21 @@ func main() {
 			fetcher,
 		)
 		jobs.NewHarvestProcessor(harvestPipeline).Register(mux)
-		log.Printf("arxiv harvest enabled categories=%s cron=%s max_results=%d",
-			strings.Join(cfg.ArxivHarvestCategories, ","), cfg.ArxivHarvestCron, cfg.ArxivHarvestMaxResults)
+		log.Printf("arxiv harvest processor registered (enabled=%t cron=%s tz=%q categories=%s max_results=%d)",
+			cfg.ArxivHarvestEnabled, cfg.ArxivHarvestCron, cfg.ArxivHarvestTimezone,
+			strings.Join(cfg.ArxivHarvestCategories, ","), cfg.ArxivHarvestMaxResults)
 	}
 
 	server := asynq.NewServer(redisOpt, asynq.Config{Concurrency: 2})
 
-	scheduler := asynq.NewScheduler(redisOpt, &asynq.SchedulerOpts{})
+	// Scheduler fires crons in the deployment's timezone (ARXIV_HARVEST_TIMEZONE,
+	// or the host local zone when blank) instead of asynq's UTC default, so a cron
+	// like "0 8 * * *" means 08:00 deployment-local.
+	schedulerLocation, err := config.ResolveLocation(cfg.ArxivHarvestTimezone)
+	if err != nil {
+		log.Fatal(err)
+	}
+	scheduler := asynq.NewScheduler(redisOpt, &asynq.SchedulerOpts{Location: schedulerLocation})
 	cleanupTask, err := jobs.NewCleanupJobsTask()
 	if err != nil {
 		log.Fatal(err)
@@ -118,7 +128,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if cfg.ArxivHarvestEnabled && len(cfg.ArxivHarvestCategories) > 0 {
-		harvestTask, err := jobs.NewHarvestArxivTask()
+		harvestTask, err := jobs.NewHarvestArxivTask(nil)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -11,6 +11,7 @@ type Dependencies struct {
 	ReadHandler        *ReadHandler
 	RetryHandler       *RetryHandler
 	FigureImageHandler *FigureImageHandler
+	HarvestHandler     *HarvestHandler
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -32,6 +33,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	if deps.FigureImageHandler != nil {
 		r.Get("/v1/papers/{id}/figures/{figureId}/image", deps.FigureImageHandler.GetFigureImage)
+	}
+	if deps.HarvestHandler != nil {
+		r.Post("/v1/harvest/arxiv", deps.HarvestHandler.TriggerArxiv)
 	}
 	return r
 }

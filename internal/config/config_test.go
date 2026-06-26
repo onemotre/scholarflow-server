@@ -1,6 +1,42 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+func TestLoadArxivTimezone(t *testing.T) {
+	t.Setenv("ARXIV_HARVEST_TIMEZONE", "")
+	if cfg := Load(); cfg.ArxivHarvestTimezone != "" {
+		t.Fatalf("timezone default = %q, want empty", cfg.ArxivHarvestTimezone)
+	}
+	t.Setenv("ARXIV_HARVEST_TIMEZONE", "Asia/Shanghai")
+	if cfg := Load(); cfg.ArxivHarvestTimezone != "Asia/Shanghai" {
+		t.Fatalf("timezone = %q, want Asia/Shanghai", cfg.ArxivHarvestTimezone)
+	}
+}
+
+func TestResolveLocation(t *testing.T) {
+	loc, err := ResolveLocation("")
+	if err != nil {
+		t.Fatalf("empty tz error: %v", err)
+	}
+	if loc != time.Local {
+		t.Fatalf("empty tz = %v, want time.Local", loc)
+	}
+
+	loc, err = ResolveLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatalf("Asia/Shanghai error: %v", err)
+	}
+	if loc.String() != "Asia/Shanghai" {
+		t.Fatalf("loc = %q, want Asia/Shanghai", loc.String())
+	}
+
+	if _, err := ResolveLocation("Not/AZone"); err == nil {
+		t.Fatal("invalid tz returned nil error, want error")
+	}
+}
 
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")

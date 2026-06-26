@@ -68,6 +68,34 @@ func sourceIDs(infos []papers.SourceInfo) []string {
 	return out
 }
 
+func TestHarvestUsesCategoryOverride(t *testing.T) {
+	src := &fakeSource{name: "arxiv", entries: map[string][]sources.Entry{
+		"cs.CL": {{SourceID: "cfg-1", PDFURL: "uc", Published: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		"cs.AI": {{SourceID: "ovr-1", PDFURL: "uo", Published: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)}},
+	}}
+	fetch := &fakeFetcher{data: map[string][]byte{"uc": []byte("%PDF-1"), "uo": []byte("%PDF-1")}}
+
+	// Configured category is cs.CL, but the override forces cs.AI for this run.
+	ing := &fakeIngester{existing: map[string]bool{}}
+	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing, fetch)
+	if err := h.Harvest(context.Background(), []string{"cs.AI"}); err != nil {
+		t.Fatalf("Harvest error: %v", err)
+	}
+	if got := sourceIDs(ing.ingested); len(got) != 1 || got[0] != "ovr-1" {
+		t.Fatalf("override ingested = %v, want [ovr-1]", got)
+	}
+
+	// No override falls back to the configured cs.CL.
+	ing2 := &fakeIngester{existing: map[string]bool{}}
+	h2 := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing2, fetch)
+	if err := h2.Harvest(context.Background(), nil); err != nil {
+		t.Fatalf("Harvest error: %v", err)
+	}
+	if got := sourceIDs(ing2.ingested); len(got) != 1 || got[0] != "cfg-1" {
+		t.Fatalf("configured ingested = %v, want [cfg-1]", got)
+	}
+}
+
 func TestHarvestIngestsNewDedupsKnown(t *testing.T) {
 	src := &fakeSource{name: "arxiv", entries: map[string][]sources.Entry{
 		"cs.CL": {
@@ -79,7 +107,7 @@ func TestHarvestIngestsNewDedupsKnown(t *testing.T) {
 	fetch := &fakeFetcher{data: map[string][]byte{"u1": []byte("%PDF-1.4 content")}}
 	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing, fetch)
 
-	if err := h.Harvest(context.Background()); err != nil {
+	if err := h.Harvest(context.Background(), nil); err != nil {
 		t.Fatalf("Harvest error: %v", err)
 	}
 	got := sourceIDs(ing.ingested)
@@ -114,7 +142,7 @@ func TestHarvestIsBestEffortPerEntry(t *testing.T) {
 	}
 	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing, fetch)
 
-	if err := h.Harvest(context.Background()); err != nil {
+	if err := h.Harvest(context.Background(), nil); err != nil {
 		t.Fatalf("Harvest should not fail on one bad entry: %v", err)
 	}
 	got := sourceIDs(ing.ingested)
@@ -129,7 +157,7 @@ func TestHarvestContinuesOnCategoryFetchError(t *testing.T) {
 	fetch := &fakeFetcher{}
 	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL", "cs.AI"}, 25, 0, ing, fetch)
 
-	if err := h.Harvest(context.Background()); err != nil {
+	if err := h.Harvest(context.Background(), nil); err != nil {
 		t.Fatalf("Harvest should swallow fetch errors: %v", err)
 	}
 	if len(ing.ingested) != 0 {

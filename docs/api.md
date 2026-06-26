@@ -7,6 +7,7 @@
 - `GET /v1/jobs/{id}`
 - `GET /v1/papers/{id}`
 - `GET /v1/papers/{id}/figures/{figureId}/image`
+- `POST /v1/harvest/arxiv`
 
 ## Local Verification
 
@@ -127,6 +128,28 @@ appropriate task re-enqueued.
 - `404 Not Found` for an unknown job id
 - `409 Conflict` when the job is not in a retryable (`failed`) state
 - `400 Bad Request` for a malformed job id
+
+### POST /v1/harvest/arxiv
+
+Manually triggers one arXiv harvest run. The request body is optional:
+
+```json
+{ "categories": ["cs.CL", "cs.CV"] }
+```
+
+- With a non-empty `categories` array, those categories override the worker's
+  configured `ARXIV_HARVEST_CATEGORIES` for this run only.
+- With an empty or absent body, the configured categories are used.
+
+The endpoint enqueues an `arxiv:harvest` task and returns immediately; the worker
+performs the fetch asynchronously (results appear via `GET /v1/papers`).
+
+- `202 Accepted` + `{ "task_id": "<asynq task id>" }` on success
+- `400 Bad Request` for a malformed JSON body
+- `500 Internal Server Error` if enqueueing fails
+
+Note: the worker only processes the task when its harvest processor is registered,
+i.e. when `ARXIV_HARVEST_ENABLED=true` **or** `ARXIV_HARVEST_CATEGORIES` is set.
 
 ### Reader Configuration
 

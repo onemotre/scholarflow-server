@@ -135,6 +135,7 @@ curl -s http://localhost:8080/v1/papers/$PAPER_ID | python3 -m json.tool
 | `GET` | `/v1/jobs/{id}` | 查询处理任务状态 |
 | `GET` | `/v1/papers/{id}` | 查询论文详情 |
 | `POST` | `/v1/jobs/{id}/retry` | 重试失败任务 |
+| `POST` | `/v1/harvest/arxiv` | 手动触发一次 arXiv 抓取，可选 body 覆盖分类 |
 
 更多响应示例见 `docs/api.md`。
 
@@ -175,14 +176,20 @@ docker compose up -d --build api worker
 
 ## arXiv 自动获取 📡
 
-默认关闭。开启后，worker 会在内置的 `asynq.Scheduler` 上注册一个每日计划任务（`arxiv:harvest`），按订阅的 arXiv 分类抓取最新提交的论文，下载 PDF 后走与本地上传**完全相同**的处理流程（GROBID 解析 →（如配置了 Reader）生成 paper card）。抓取到的论文只是 `source_type` 为 `arxiv`、并带有 `source_id`（arXiv id），其余在 API 中与上传论文无差别。
+worker 会按订阅的 arXiv 分类抓取最新提交的论文，下载 PDF 后走与本地上传**完全相同**的处理流程（GROBID 解析 →（如配置了 Reader）生成 paper card）。抓取到的论文只是 `source_type` 为 `arxiv`、并带有 `source_id`（arXiv id），其余在 API 中与上传论文无差别。
+
+有两种触发方式：
+
+- **自动（计划任务）**：开启后在内置 `asynq.Scheduler` 上注册 `arxiv:harvest` 计划任务，按 `ARXIV_HARVEST_CRON` 在**指定时间**运行。
+- **手动（API）**：`POST /v1/harvest/arxiv` 立即触发一次抓取，可在 body 中覆盖分类（见下方「手动触发」）。只要配置了分类（或开启了功能），worker 就会注册处理器，因此即便关闭了计划任务也能手动触发。
 
 在 `.env` 中配置：
 
 ```bash
 ARXIV_HARVEST_ENABLED=true
 ARXIV_HARVEST_CATEGORIES=cs.CL,cs.AI
-ARXIV_HARVEST_CRON=@daily
+ARXIV_HARVEST_CRON=0 8 * * *
+ARXIV_HARVEST_TIMEZONE=Asia/Shanghai
 ARXIV_HARVEST_MAX_RESULTS=50
 ARXIV_API_BASE_URL=http://export.arxiv.org/api/query
 ARXIV_REQUEST_DELAY_SECONDS=3
@@ -190,8 +197,9 @@ ARXIV_REQUEST_DELAY_SECONDS=3
 
 说明：
 
-- `ARXIV_HARVEST_ENABLED=false` 时整个功能为空操作，不注册处理器也不注册计划任务
+- `ARXIV_HARVEST_ENABLED=false` 时不注册**计划任务**；但只要 `ARXIV_HARVEST_CATEGORIES` 非空，处理器仍会注册，可通过 API 手动触发（即「仅手动」模式）
 - `ARXIV_HARVEST_CATEGORIES` 为逗号分隔的 arXiv 分类代码，留空则不抓取
+- **指定运行时间**：`ARXIV_HARVEST_CRON` 用 cron 表达式指定时间（如 `0 8 * * *` 为每天 08:00）；`ARXIV_HARVEST_TIMEZONE` 指定时区，**留空则使用部署系统本地时区（`TZ`）**。asynq 默认按 UTC 触发，本项目改为按该时区触发，使「指定时间」与部署机器一致
 - 每个分类按提交时间倒序取前 `ARXIV_HARVEST_MAX_RESULTS` 篇；若某分类单日新增超过该上限，超出的尾部会被漏掉（可调大该值）
 - 抓取是**尽力而为**的：单篇下载/解析失败会记录日志并跳过，不影响其它论文；通过 `source_id` 去重，因此重跑或漏跑某天都是幂等的
 - 下载有大小上限（复用 `MAX_UPLOAD_BYTES`），并会校验 PDF 文件头，HTML 错误页不会被入库
@@ -203,6 +211,20 @@ ARXIV_REQUEST_DELAY_SECONDS=3
 - 官方分类总表（推荐）：<https://arxiv.org/category_taxonomy>
 - 常用示例：`cs.CL`（计算语言学/NLP）、`cs.AI`（人工智能）、`cs.LG`（机器学习）、`cs.CV`（计算机视觉）、`stat.ML`（统计机器学习）
 - 也可在 arXiv 任意分类列表页 URL 中看到代码，如 `https://arxiv.org/list/cs.CL/recent`
+
+**手动触发：**
+
+```bash
+# 使用已配置的分类立即抓取一次
+curl -i -X POST http://localhost:8080/v1/harvest/arxiv
+
+# 本次抓取覆盖分类（仅影响这一次，不改动配置）
+curl -i -X POST http://localhost:8080/v1/harvest/arxiv \
+  -H 'Content-Type: application/json' \
+  -d '{"categories":["cs.CL","cs.CV"]}'
+```
+
+返回 `202 Accepted` 与 `{"task_id":"..."}`；实际抓取由 worker 异步执行，结果通过 `GET /v1/papers` 查看。
 
 修改配置后重启 worker：
 
@@ -241,6 +263,7 @@ docker compose up -d --build worker
 | `ARXIV_HARVEST_MAX_RESULTS` | `50` | 每个分类每次抓取的上限 |
 | `ARXIV_API_BASE_URL` | `http://export.arxiv.org/api/query` | arXiv Query API 地址 |
 | `ARXIV_REQUEST_DELAY_SECONDS` | `3` | 请求间礼貌性延迟（查询与下载） |
+| `ARXIV_HARVEST_TIMEZONE` | 空 | 计划任务时区，留空用部署系统本地时区（`TZ`） |
 
 ## TODO ☑️
 

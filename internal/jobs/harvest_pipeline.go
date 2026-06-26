@@ -48,10 +48,17 @@ func NewHarvestPipeline(srcs []sources.Source, categories []string, maxResults i
 	}
 }
 
-func (h *HarvestPipeline) Harvest(ctx context.Context) error {
+// Harvest runs one harvest pass. When categoriesOverride is non-empty it is used
+// instead of the configured categories (the manual-trigger API path); otherwise
+// the worker's configured categories are used (the scheduled-cron path).
+func (h *HarvestPipeline) Harvest(ctx context.Context, categoriesOverride []string) error {
+	categories := h.categories
+	if len(categoriesOverride) > 0 {
+		categories = categoriesOverride
+	}
 	ingested := 0
 	for _, src := range h.sources {
-		for _, cat := range h.categories {
+		for _, cat := range categories {
 			entries, err := src.FetchRecent(ctx, cat, h.maxResults)
 			if err != nil {
 				log.Printf("harvest: source=%s category=%s fetch failed: %v", src.Name(), cat, err)
