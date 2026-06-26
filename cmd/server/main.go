@@ -50,6 +50,7 @@ func main() {
 	readHandler := httpapi.NewReadHandler(readRepo)
 	retryHandler := httpapi.NewRetryHandler(papers.NewRetryService(readRepo, enqueuer))
 	figureImageHandler := httpapi.NewFigureImageHandler(readRepo, store)
+	harvestHandler := httpapi.NewHarvestHandler(enqueuer)
 
 	log.Printf("starting api on %s", cfg.HTTPAddr)
 	if err := http.ListenAndServe(cfg.HTTPAddr, httpapi.NewRouter(httpapi.Dependencies{
@@ -57,6 +58,7 @@ func main() {
 		ReadHandler:        readHandler,
 		RetryHandler:       retryHandler,
 		FigureImageHandler: figureImageHandler,
+		HarvestHandler:     harvestHandler,
 	})); err != nil {
 		log.Fatal(err)
 	}

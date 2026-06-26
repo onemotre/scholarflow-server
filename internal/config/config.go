@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type Config struct {
@@ -31,6 +33,14 @@ type Config struct {
 	FigureExtractDPI        int
 	FigureExtractPaddingPct int
 	FigureExtractMaxDim     int
+
+	ArxivHarvestEnabled      bool
+	ArxivHarvestCategories   []string
+	ArxivHarvestCron         string
+	ArxivHarvestMaxResults   int
+	ArxivAPIBaseURL          string
+	ArxivRequestDelaySeconds int
+	ArxivHarvestTimezone     string
 }
 
 func Load() Config {
@@ -60,6 +70,14 @@ func Load() Config {
 		FigureExtractDPI:        int(envInt64("FIGURE_EXTRACT_DPI", 150)),
 		FigureExtractPaddingPct: int(envInt64("FIGURE_EXTRACT_PADDING_PCT", 2)),
 		FigureExtractMaxDim:     int(envInt64("FIGURE_EXTRACT_MAX_DIM", 2000)),
+
+		ArxivHarvestEnabled:      envBool("ARXIV_HARVEST_ENABLED", false),
+		ArxivHarvestCategories:   envCSV("ARXIV_HARVEST_CATEGORIES"),
+		ArxivHarvestCron:         envString("ARXIV_HARVEST_CRON", "@daily"),
+		ArxivHarvestMaxResults:   int(envInt64("ARXIV_HARVEST_MAX_RESULTS", 50)),
+		ArxivAPIBaseURL:          envString("ARXIV_API_BASE_URL", "http://export.arxiv.org/api/query"),
+		ArxivRequestDelaySeconds: int(envInt64("ARXIV_REQUEST_DELAY_SECONDS", 3)),
+		ArxivHarvestTimezone:     envString("ARXIV_HARVEST_TIMEZONE", ""),
 	}
 }
 
@@ -92,4 +110,30 @@ func envInt64(key string, fallback int64) int64 {
 		return fallback
 	}
 	return parsed
+}
+
+// envCSV parses a comma-separated env var into a trimmed, non-empty slice.
+// ResolveLocation returns the time.Location for scheduling. An empty tz uses the
+// deployment host's local timezone (TZ env / time.Local); otherwise tz is looked
+// up in the IANA database (e.g. "Asia/Shanghai").
+func ResolveLocation(tz string) (*time.Location, error) {
+	if tz == "" {
+		return time.Local, nil
+	}
+	return time.LoadLocation(tz)
+}
+
+func envCSV(key string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

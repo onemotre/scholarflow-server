@@ -30,6 +30,7 @@ type Paper struct {
 	UploadedFilename string
 	CreatedAt        pgtype.Timestamptz
 	UpdatedAt        pgtype.Timestamptz
+	SourceID         *string
 }
 
 type PaperAsset struct {

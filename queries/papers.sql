@@ -1,6 +1,6 @@
 -- name: CreatePaper :one
-INSERT INTO papers (source_type, status, uploaded_filename)
-VALUES ($1, $2, $3)
+INSERT INTO papers (source_type, source_id, status, uploaded_filename, title, abstract, doi, publication_year)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: UpdatePaperMetadata :one
@@ -160,3 +160,8 @@ SELECT a.*
 FROM paper_figures f
 JOIN paper_assets a ON a.id = f.image_asset_id
 WHERE f.id = sqlc.arg(figure_id) AND f.paper_id = sqlc.arg(paper_id);
+
+-- name: ExistsPaperBySource :one
+SELECT EXISTS (
+    SELECT 1 FROM papers WHERE source_type = 'arxiv' AND source_id = $1
+);
