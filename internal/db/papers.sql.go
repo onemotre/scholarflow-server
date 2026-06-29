@@ -716,7 +716,7 @@ func (q *Queries) ListPaperSections(ctx context.Context, paperID uuid.UUID) ([]P
 }
 
 const listPapers = `-- name: ListPapers :many
-SELECT id, title, status, publication_year, uploaded_filename, created_at
+SELECT id, source_type, source_id, primary_category, title, status, publication_year, uploaded_filename, created_at
 FROM papers
 ORDER BY created_at DESC
 LIMIT 500
@@ -724,6 +724,9 @@ LIMIT 500
 
 type ListPapersRow struct {
 	ID               uuid.UUID
+	SourceType       string
+	SourceID         *string
+	PrimaryCategory  *string
 	Title            *string
 	Status           string
 	PublicationYear  *int32
@@ -742,6 +745,9 @@ func (q *Queries) ListPapers(ctx context.Context) ([]ListPapersRow, error) {
 		var i ListPapersRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.SourceType,
+			&i.SourceID,
+			&i.PrimaryCategory,
 			&i.Title,
 			&i.Status,
 			&i.PublicationYear,

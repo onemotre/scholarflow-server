@@ -82,6 +82,9 @@ type FigureDTO struct {
 
 type PaperSummary struct {
 	PaperID          uuid.UUID  `json:"paper_id"`
+	SourceType       string     `json:"source_type"`
+	SourceID         *string    `json:"source_id,omitempty"`
+	PrimaryCategory  *string    `json:"primary_category,omitempty"`
 	Title            *string    `json:"title,omitempty"`
 	Status           string     `json:"status"`
 	PublicationYear  *int32     `json:"publication_year,omitempty"`
@@ -126,6 +129,9 @@ func (r *SQLReadRepository) ListPapers(ctx context.Context) ([]PaperSummary, err
 	for _, row := range rows {
 		summaries = append(summaries, PaperSummary{
 			PaperID:          row.ID,
+			SourceType:       row.SourceType,
+			SourceID:         row.SourceID,
+			PrimaryCategory:  row.PrimaryCategory,
 			Title:            row.Title,
 			Status:           row.Status,
 			PublicationYear:  row.PublicationYear,

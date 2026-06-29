@@ -162,6 +162,45 @@ func TestListPapers(t *testing.T) {
 	}
 }
 
+func TestListPapersIncludesSourceFields(t *testing.T) {
+	title := "Arxiv Paper"
+	sourceID := "2301.00001"
+	category := "cs.CL"
+	h := NewReadHandler(&fakeReader{summaries: []papers.PaperSummary{
+		{
+			PaperID:          uuid.New(),
+			Title:            &title,
+			Status:           "completed",
+			UploadedFilename: "2301.00001.pdf",
+			SourceType:       "arxiv",
+			SourceID:         &sourceID,
+			PrimaryCategory:  &category,
+		},
+	}})
+	req := httptest.NewRequest(http.MethodGet, "/v1/papers", nil)
+	rr := httptest.NewRecorder()
+	NewRouter(Dependencies{ReadHandler: h}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var got []papers.PaperSummary
+	if err := json.NewDecoder(rr.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].SourceType != "arxiv" {
+		t.Fatalf("source_type = %q, want arxiv", got[0].SourceType)
+	}
+	if got[0].SourceID == nil || *got[0].SourceID != "2301.00001" {
+		t.Fatalf("source_id = %v, want 2301.00001", got[0].SourceID)
+	}
+	if got[0].PrimaryCategory == nil || *got[0].PrimaryCategory != "cs.CL" {
+		t.Fatalf("primary_category = %v, want cs.CL", got[0].PrimaryCategory)
+	}
+}
+
 func TestGetPaperNotFound(t *testing.T) {
 	reader := &fakeReader{paperErr: papers.ErrNotFound}
 	srv := newTestServer(reader)
