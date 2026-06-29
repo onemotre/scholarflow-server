@@ -27,6 +27,7 @@ func (r *SQLRepository) CreatePaperUpload(ctx context.Context, info SourceInfo, 
 		Abstract:         optString(info.Abstract),
 		Doi:              optString(info.DOI),
 		PublicationYear:  optInt32(info.Year),
+		PrimaryCategory:  optString(info.PrimaryCategory),
 	})
 	if err != nil {
 		return UploadResult{}, err

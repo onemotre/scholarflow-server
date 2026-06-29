@@ -1,6 +1,6 @@
 -- name: CreatePaper :one
-INSERT INTO papers (source_type, source_id, status, uploaded_filename, title, abstract, doi, publication_year)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO papers (source_type, source_id, status, uploaded_filename, title, abstract, doi, publication_year, primary_category)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: UpdatePaperMetadata :one

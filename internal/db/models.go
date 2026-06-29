@@ -31,6 +31,7 @@ type Paper struct {
 	CreatedAt        pgtype.Timestamptz
 	UpdatedAt        pgtype.Timestamptz
 	SourceID         *string
+	PrimaryCategory  *string
 }
 
 type PaperAsset struct {

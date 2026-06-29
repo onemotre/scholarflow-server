@@ -201,3 +201,22 @@ func TestFilenameFlattening(t *testing.T) {
 		t.Fatalf("filenameForEntry = %q, want cond-mat_0211034.pdf", got)
 	}
 }
+
+func TestHarvestThreadsPrimaryCategory(t *testing.T) {
+	src := &fakeSource{name: "arxiv", entries: map[string][]sources.Entry{
+		"cs.CL": {
+			{SourceID: "2301.00009", Title: "Cat", PDFURL: "u9", PrimaryCategory: "cs.CL",
+				Published: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC)},
+		},
+	}}
+	ing := &fakeIngester{existing: map[string]bool{}}
+	fetch := &fakeFetcher{data: map[string][]byte{"u9": []byte("%PDF-1.4 content")}}
+	h := NewHarvestPipeline([]sources.Source{src}, []string{"cs.CL"}, 25, 0, ing, fetch)
+
+	if err := h.Harvest(context.Background(), nil); err != nil {
+		t.Fatalf("Harvest error: %v", err)
+	}
+	if len(ing.ingested) != 1 || ing.ingested[0].PrimaryCategory != "cs.CL" {
+		t.Fatalf("PrimaryCategory = %#v, want cs.CL", ing.ingested)
+	}
+}

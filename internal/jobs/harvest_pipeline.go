@@ -113,13 +113,14 @@ func (h *HarvestPipeline) ingestEntry(ctx context.Context, src sources.Source, e
 		year = int32(e.Published.Year())
 	}
 	info := papers.SourceInfo{
-		SourceType: src.Name(),
-		SourceID:   e.SourceID,
-		Filename:   filenameForEntry(e),
-		Title:      e.Title,
-		Abstract:   e.Abstract,
-		DOI:        e.DOI,
-		Year:       year,
+		SourceType:      src.Name(),
+		SourceID:        e.SourceID,
+		Filename:        filenameForEntry(e),
+		Title:           e.Title,
+		Abstract:        e.Abstract,
+		DOI:             e.DOI,
+		Year:            year,
+		PrimaryCategory: e.PrimaryCategory,
 	}
 	if _, err := h.ingester.IngestPDF(ctx, info, bytes.NewReader(data), int64(len(data)), "application/pdf"); err != nil {
 		return false, fmt.Errorf("ingest: %w", err)

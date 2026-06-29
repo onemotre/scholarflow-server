@@ -24,9 +24,9 @@ func (q *Queries) CountPaperSections(ctx context.Context, paperID uuid.UUID) (in
 }
 
 const createPaper = `-- name: CreatePaper :one
-INSERT INTO papers (source_type, source_id, status, uploaded_filename, title, abstract, doi, publication_year)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id
+INSERT INTO papers (source_type, source_id, status, uploaded_filename, title, abstract, doi, publication_year, primary_category)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id, primary_category
 `
 
 type CreatePaperParams struct {
@@ -38,6 +38,7 @@ type CreatePaperParams struct {
 	Abstract         *string
 	Doi              *string
 	PublicationYear  *int32
+	PrimaryCategory  *string
 }
 
 func (q *Queries) CreatePaper(ctx context.Context, arg CreatePaperParams) (Paper, error) {
@@ -50,6 +51,7 @@ func (q *Queries) CreatePaper(ctx context.Context, arg CreatePaperParams) (Paper
 		arg.Abstract,
 		arg.Doi,
 		arg.PublicationYear,
+		arg.PrimaryCategory,
 	)
 	var i Paper
 	err := row.Scan(
@@ -64,6 +66,7 @@ func (q *Queries) CreatePaper(ctx context.Context, arg CreatePaperParams) (Paper
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SourceID,
+		&i.PrimaryCategory,
 	)
 	return i, err
 }
@@ -506,7 +509,7 @@ func (q *Queries) GetLatestPaperCard(ctx context.Context, paperID uuid.UUID) (Pa
 }
 
 const getPaper = `-- name: GetPaper :one
-SELECT id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id FROM papers WHERE id = $1
+SELECT id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id, primary_category FROM papers WHERE id = $1
 `
 
 func (q *Queries) GetPaper(ctx context.Context, id uuid.UUID) (Paper, error) {
@@ -524,6 +527,7 @@ func (q *Queries) GetPaper(ctx context.Context, id uuid.UUID) (Paper, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SourceID,
+		&i.PrimaryCategory,
 	)
 	return i, err
 }
@@ -870,7 +874,7 @@ SET title = $2,
     status = $6,
     updated_at = now()
 WHERE id = $1
-RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id
+RETURNING id, source_type, status, title, abstract, doi, publication_year, uploaded_filename, created_at, updated_at, source_id, primary_category
 `
 
 type UpdatePaperMetadataParams struct {
@@ -904,6 +908,7 @@ func (q *Queries) UpdatePaperMetadata(ctx context.Context, arg UpdatePaperMetada
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SourceID,
+		&i.PrimaryCategory,
 	)
 	return i, err
 }
