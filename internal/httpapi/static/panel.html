@@ -54,8 +54,12 @@
 
   <div id="settings-view" hidden>
     <section class="settings">
-      <h2>Settings</h2>
-      <p class="muted">Runtime settings management is delivered by the settings-system plan (Plan 2). This container is intentionally left for that plan to populate.</p>
+      <div class="list-head">
+        <h2>Settings</h2>
+        <button id="settings-refresh">Refresh</button>
+      </div>
+      <p class="muted">DB overrides env. Secrets are write-only. "restart required" settings take effect after restarting the api/worker.</p>
+      <div id="settings-list"></div>
     </section>
   </div>
 
@@ -63,5 +67,6 @@
   <dialog id="detail"></dialog>
 
   <script src="/panel/static/panel.js"></script>
+  <script src="/panel/static/settings.js"></script>
 </body>
 </html>
