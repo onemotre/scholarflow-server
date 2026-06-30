@@ -24,9 +24,6 @@ function toast(msg) {
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { el.hidden = true; }, 3000);
 }
-// Exposed so Plan 2's settings.js can reuse the helpers without redefining them.
-window.panel = { $, authHeaders, toast, api, escapeHtml };
-
 async function api(method, url, opts = {}) {
   const headers = method === "GET" ? {} : authHeaders();
   const resp = await fetch(url, { method, headers: { ...headers, ...(opts.headers || {}) }, body: opts.body });
@@ -59,7 +56,7 @@ async function loadPapers() {
         <td>${escapeHtml(p.title || "(untitled)")}</td>
         <td>${escapeHtml(sourceLabel(p))}</td>
         <td class="status">${escapeHtml(p.status)}</td>
-        <td>${p.publication_year || ""}</td>
+        <td>${escapeHtml(p.publication_year || "")}</td>
         <td>${fmtDate(p.created_at)}</td>
         <td class="actions"></td>`;
       const cell = tr.querySelector(".actions");
@@ -87,6 +84,9 @@ function actionBtn(label, fn, danger = false) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+// Exposed so Plan 2's settings.js can reuse the helpers without redefining them.
+window.panel = { $, authHeaders, toast, api, escapeHtml };
 
 async function runAction(id, kind) {
   try {
@@ -125,7 +125,7 @@ async function viewPaper(id) {
     const p = await api("GET", `/v1/papers/${id}`);
     dlg.innerHTML = `
       <h2>${escapeHtml(p.title || "(untitled)")}</h2>
-      <p class="muted">status: ${escapeHtml(p.status)} · year: ${p.publication_year || "?"} · file: ${escapeHtml(p.uploaded_filename)}</p>
+      <p class="muted">status: ${escapeHtml(p.status)} · year: ${escapeHtml(p.publication_year || "?")} · file: ${escapeHtml(p.uploaded_filename)}</p>
       <p>${p.authors.length} authors · ${p.sections.length} sections · ${p.references.length} references · ${p.figures.length} figures · card: ${p.card ? "yes" : "no"}</p>
       <pre>${escapeHtml(p.abstract || "(no abstract)")}</pre>
       <form method="dialog"><button>Close</button></form>`;

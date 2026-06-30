@@ -36,4 +36,7 @@ func TestPanelStaticServesCSS(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/css") {
+		t.Fatalf("content-type = %q, want text/css", ct)
+	}
 }
