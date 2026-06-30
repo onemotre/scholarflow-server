@@ -150,11 +150,18 @@ func (p *Provider) CSV(ctx context.Context, key string) []string {
 
 // Snapshot builds a config.Config resolving every key through the override->env
 // ->default chain. Callers take this once at startup.
+// Bootstrap keys (ApplyBootstrap) are never sourced from DB overrides: even if
+// a row exists (e.g. inserted directly by SQL), the env value takes precedence
+// so that DATABASE_URL and other infrastructure settings cannot be altered via
+// the database itself.
 func (p *Provider) Snapshot(ctx context.Context) config.Config {
 	overrides := p.overrideMap(ctx)
 	return config.Build(func(key string) (string, bool) {
 		if v, ok := overrides[key]; ok {
-			return v, true
+			if d, found := ByKey(key); !found || d.Apply != ApplyBootstrap {
+				return v, true
+			}
+			// bootstrap key: ignore any DB override, fall through to env
 		}
 		return os.LookupEnv(key)
 	})

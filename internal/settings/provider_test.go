@@ -95,6 +95,31 @@ func TestProviderSnapshotAppliesOverrides(t *testing.T) {
 	}
 }
 
+func TestSnapshotIgnoresBootstrapOverride(t *testing.T) {
+	repo := newFakeRepo()
+	// Simulate a row that a DBA inserted directly via SQL — should be ignored for
+	// bootstrap keys because Snapshot must not let the DB override its own DSN.
+	repo.data["DATABASE_URL"] = "postgres://evil:evil@attacker.example/db"
+	// Also add a non-bootstrap override to confirm those still apply.
+	repo.data["GROBID_URL"] = "http://grobid.override:8070"
+	p := NewProvider(repo, time.Minute)
+	ctx := context.Background()
+	// Ensure DATABASE_URL env is not set so we get the registry default.
+	t.Setenv("DATABASE_URL", "")
+	cfg := p.Snapshot(ctx)
+	const defaultDSN = "postgres://scholarflow:scholarflow@localhost:5432/scholarflow?sslmode=disable"
+	if cfg.DatabaseURL == "postgres://evil:evil@attacker.example/db" {
+		t.Fatal("Snapshot applied a DB override for bootstrap key DATABASE_URL — secret leak risk")
+	}
+	if cfg.DatabaseURL != defaultDSN {
+		t.Fatalf("Snapshot DatabaseURL = %q, want default %q", cfg.DatabaseURL, defaultDSN)
+	}
+	// Non-bootstrap override must still apply.
+	if cfg.GROBIDURL != "http://grobid.override:8070" {
+		t.Fatalf("Snapshot GROBIDURL = %q, want override", cfg.GROBIDURL)
+	}
+}
+
 func TestProviderSetValidates(t *testing.T) {
 	repo := newFakeRepo()
 	p := NewProvider(repo, time.Minute)

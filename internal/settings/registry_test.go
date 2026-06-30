@@ -48,7 +48,7 @@ func TestByKey(t *testing.T) {
 // getter returns each registry key's Default must not panic, and the registry
 // must not reference a key config never reads. We assert the known secret set.
 func TestRegistrySecretsAreExpected(t *testing.T) {
-	wantSecret := map[string]bool{"WRITE_API_TOKEN": true, "OPENAI_API_KEY": true, "MINIO_SECRET_KEY": true}
+	wantSecret := map[string]bool{"WRITE_API_TOKEN": true, "OPENAI_API_KEY": true, "MINIO_SECRET_KEY": true, "DATABASE_URL": true}
 	for _, d := range Registry {
 		if d.Secret && !wantSecret[d.Key] {
 			t.Fatalf("unexpected secret key %q", d.Key)

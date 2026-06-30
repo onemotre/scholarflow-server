@@ -36,7 +36,7 @@ type Def struct {
 var Registry = []Def{
 	// infra (bootstrap, read-only)
 	{Key: "HTTP_ADDR", Group: "infra", Kind: KindString, Apply: ApplyBootstrap, Default: ":8080", Label: "HTTP address", Help: "API listen address. Restart-only infrastructure."},
-	{Key: "DATABASE_URL", Group: "infra", Kind: KindString, Apply: ApplyBootstrap, Default: "postgres://scholarflow:scholarflow@localhost:5432/scholarflow?sslmode=disable", Label: "Database URL", Help: "Postgres DSN. Cannot be overridden via the database itself."},
+	{Key: "DATABASE_URL", Group: "infra", Kind: KindString, Secret: true, Apply: ApplyBootstrap, Default: "postgres://scholarflow:scholarflow@localhost:5432/scholarflow?sslmode=disable", Label: "Database URL", Help: "Postgres DSN (contains user:password). Cannot be overridden via the database itself. Value is masked in the API response."},
 	{Key: "REDIS_ADDR", Group: "infra", Kind: KindString, Apply: ApplyBootstrap, Default: "localhost:6379", Label: "Redis address", Help: "Asynq/Redis address."},
 	{Key: "MINIO_ENDPOINT", Group: "infra", Kind: KindString, Apply: ApplyBootstrap, Default: "localhost:9000", Label: "MinIO endpoint", Help: "Object storage endpoint."},
 	{Key: "MINIO_ACCESS_KEY", Group: "infra", Kind: KindString, Apply: ApplyBootstrap, Default: "scholarflow", Label: "MinIO access key", Help: "Object storage access key."},
