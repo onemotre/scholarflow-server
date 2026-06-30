@@ -394,6 +394,18 @@ func (q *Queries) DeleteFailedJobsOlderThan(ctx context.Context, updatedAt pgtyp
 	return result.RowsAffected(), nil
 }
 
+const deletePaper = `-- name: DeletePaper :execrows
+DELETE FROM papers WHERE id = $1
+`
+
+func (q *Queries) DeletePaper(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePaper, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePaperAuthors = `-- name: DeletePaperAuthors :exec
 DELETE FROM paper_authors WHERE paper_id = $1
 `
@@ -490,6 +502,30 @@ func (q *Queries) GetFigureImageAsset(ctx context.Context, arg GetFigureImageAss
 	return i, err
 }
 
+const getLatestJobByPaper = `-- name: GetLatestJobByPaper :one
+SELECT id, paper_id, status, task_id, error_message, attempt_count, created_at, updated_at, completed_at FROM paper_processing_jobs
+WHERE paper_id = $1
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestJobByPaper(ctx context.Context, paperID uuid.UUID) (PaperProcessingJob, error) {
+	row := q.db.QueryRow(ctx, getLatestJobByPaper, paperID)
+	var i PaperProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.PaperID,
+		&i.Status,
+		&i.TaskID,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const getLatestPaperCard = `-- name: GetLatestPaperCard :one
 SELECT id, paper_id, schema_version, model, content_json, created_at FROM paper_cards WHERE paper_id = $1 ORDER BY created_at DESC LIMIT 1
 `
@@ -580,6 +616,35 @@ func (q *Queries) GetProcessingJob(ctx context.Context, id uuid.UUID) (PaperProc
 		&i.CompletedAt,
 	)
 	return i, err
+}
+
+const listPaperAssets = `-- name: ListPaperAssets :many
+SELECT storage_bucket, storage_key FROM paper_assets WHERE paper_id = $1
+`
+
+type ListPaperAssetsRow struct {
+	StorageBucket string
+	StorageKey    string
+}
+
+func (q *Queries) ListPaperAssets(ctx context.Context, paperID uuid.UUID) ([]ListPaperAssetsRow, error) {
+	rows, err := q.db.Query(ctx, listPaperAssets, paperID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPaperAssetsRow
+	for rows.Next() {
+		var i ListPaperAssetsRow
+		if err := rows.Scan(&i.StorageBucket, &i.StorageKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPaperAuthors = `-- name: ListPaperAuthors :many
@@ -762,6 +827,24 @@ func (q *Queries) ListPapers(ctx context.Context) ([]ListPapersRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const requeueJob = `-- name: RequeueJob :execrows
+UPDATE paper_processing_jobs
+SET status = 'queued',
+    attempt_count = 0,
+    error_message = NULL,
+    completed_at = NULL,
+    updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) RequeueJob(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, requeueJob, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const resetFailedJob = `-- name: ResetFailedJob :execrows

@@ -165,3 +165,24 @@ WHERE f.id = sqlc.arg(figure_id) AND f.paper_id = sqlc.arg(paper_id);
 SELECT EXISTS (
     SELECT 1 FROM papers WHERE source_type = 'arxiv' AND source_id = $1
 );
+
+-- name: ListPaperAssets :many
+SELECT storage_bucket, storage_key FROM paper_assets WHERE paper_id = $1;
+
+-- name: DeletePaper :execrows
+DELETE FROM papers WHERE id = $1;
+
+-- name: GetLatestJobByPaper :one
+SELECT * FROM paper_processing_jobs
+WHERE paper_id = $1
+ORDER BY created_at DESC
+LIMIT 1;
+
+-- name: RequeueJob :execrows
+UPDATE paper_processing_jobs
+SET status = 'queued',
+    attempt_count = 0,
+    error_message = NULL,
+    completed_at = NULL,
+    updated_at = now()
+WHERE id = $1;
