@@ -9,6 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppSetting struct {
+	Key       string
+	Value     string
+	UpdatedAt pgtype.Timestamptz
+}
+
 type Institution struct {
 	ID          uuid.UUID
 	DisplayName string
