@@ -92,6 +92,12 @@ type PaperSummary struct {
 	CreatedAt        *time.Time `json:"created_at,omitempty"`
 }
 
+// AssetRef identifies a stored object backing a paper (for cleanup on delete).
+type AssetRef struct {
+	Bucket string
+	Key    string
+}
+
 type SQLReadRepository struct {
 	queries *db.Queries
 }
@@ -263,6 +269,46 @@ func (r *SQLReadRepository) GetFigureImageKey(ctx context.Context, paperID, figu
 		return "", err
 	}
 	return asset.StorageKey, nil
+}
+
+func (r *SQLReadRepository) ListPaperAssets(ctx context.Context, paperID uuid.UUID) ([]AssetRef, error) {
+	rows, err := r.queries.ListPaperAssets(ctx, paperID)
+	if err != nil {
+		return nil, err
+	}
+	refs := make([]AssetRef, 0, len(rows))
+	for _, row := range rows {
+		refs = append(refs, AssetRef{Bucket: row.StorageBucket, Key: row.StorageKey})
+	}
+	return refs, nil
+}
+
+func (r *SQLReadRepository) DeletePaper(ctx context.Context, paperID uuid.UUID) (int64, error) {
+	return r.queries.DeletePaper(ctx, paperID)
+}
+
+func (r *SQLReadRepository) GetLatestJobByPaper(ctx context.Context, paperID uuid.UUID) (JobStatus, error) {
+	job, err := r.queries.GetLatestJobByPaper(ctx, paperID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return JobStatus{}, ErrNotFound
+		}
+		return JobStatus{}, err
+	}
+	return JobStatus{
+		JobID:        job.ID,
+		PaperID:      job.PaperID,
+		Status:       job.Status,
+		AttemptCount: job.AttemptCount,
+		ErrorMessage: job.ErrorMessage,
+		CreatedAt:    timestamp(job.CreatedAt),
+		UpdatedAt:    timestamp(job.UpdatedAt),
+		CompletedAt:  timestamp(job.CompletedAt),
+	}, nil
+}
+
+func (r *SQLReadRepository) RequeueJob(ctx context.Context, jobID uuid.UUID) (int64, error) {
+	return r.queries.RequeueJob(ctx, jobID)
 }
 
 func timestamp(ts pgtype.Timestamptz) *time.Time {

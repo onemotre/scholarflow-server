@@ -7,14 +7,20 @@
 - `GET /v1/jobs/{id}`
 - `POST /v1/jobs/{id}/retry`
 - `GET /v1/papers/{id}`
+- `DELETE /v1/papers/{id}`
 - `GET /v1/papers/{id}/figures/{figureId}/image`
+- `POST /v1/papers/{id}/reprocess`
+- `POST /v1/papers/{id}/reread`
 - `POST /v1/harvest/arxiv`
+- `GET /panel`
+- `GET /panel/static/*`
 
 ## Authentication
 
-The three write endpoints — `POST /v1/uploads/papers`, `POST /v1/jobs/{id}/retry`,
-and `POST /v1/harvest/arxiv` — require a bearer token when `WRITE_API_TOKEN` is
-configured on the server. Send it as:
+The write endpoints — `POST /v1/uploads/papers`, `POST /v1/jobs/{id}/retry`,
+`POST /v1/harvest/arxiv`, `DELETE /v1/papers/{id}`,
+`POST /v1/papers/{id}/reprocess`, and `POST /v1/papers/{id}/reread` — require a
+bearer token when `WRITE_API_TOKEN` is configured on the server. Send it as:
 
     Authorization: Bearer <WRITE_API_TOKEN>
 
@@ -102,6 +108,87 @@ Streams the extracted PNG for a figure. `figureId` is the `id` from a figure in
 
 Each figure object in `GET /v1/papers/{id}` now includes `"id"` (UUID) and
 `"has_image"` (bool) so clients know which figures have an image to fetch.
+
+### `DELETE /v1/papers/{id}`
+
+Hard-deletes a paper and all its associated data. The deletion is DB-first then
+best-effort object cleanup: child rows (`paper_authors`, `paper_sections`,
+`paper_references`, `paper_figures`, `paper_cards`, `paper_evidence`,
+`paper_assets`, `paper_processing_jobs`) are removed via cascade, then the
+corresponding MinIO objects are deleted. Requires a write token when
+`WRITE_API_TOKEN` is configured.
+
+- `204 No Content` — the paper (and all child rows and objects) was deleted.
+- `404 Not Found` — no paper with that id exists.
+- `400 Bad Request` — malformed UUID.
+- `401 Unauthorized` — write token required and missing or invalid.
+
+### `POST /v1/papers/{id}/reprocess`
+
+Re-enqueues the parse stage for an existing paper, regardless of its current
+job status. The paper's processing job is reset (`status=queued`,
+`attempt_count=0`, `error_message=null`) and a new `paper:process` task is
+enqueued. Use this to re-run parsing after a GROBID outage or a parser update.
+Requires a write token when `WRITE_API_TOKEN` is configured.
+
+Returns the reset job as a `JobStatus` JSON object:
+
+```json
+{
+  "job_id": "857a57d9-...",
+  "paper_id": "bca2c01d-...",
+  "status": "queued",
+  "attempt_count": 0,
+  "error_message": null,
+  "created_at": "2026-06-17T22:18:22+08:00",
+  "updated_at": "2026-06-29T10:00:00+08:00",
+  "completed_at": null
+}
+```
+
+- `202 Accepted` + the reset `JobStatus` JSON.
+- `404 Not Found` — no paper with that id exists.
+- `400 Bad Request` — malformed UUID.
+- `401 Unauthorized` — write token required and missing or invalid.
+
+### `POST /v1/papers/{id}/reread`
+
+Re-enqueues the read stage to regenerate the paper card for an existing paper.
+The processing job is reset and a `paper:read` task is enqueued. The paper must
+have parsed sections (i.e. have passed the parse stage at least once) for the
+read stage to proceed. Requires a write token when `WRITE_API_TOKEN` is
+configured.
+
+Returns the reset job as a `JobStatus` JSON object (same shape as
+`POST /v1/papers/{id}/reprocess`).
+
+- `202 Accepted` + the reset `JobStatus` JSON.
+- `409 Conflict` — the paper has no parsed sections; run reprocess first.
+- `404 Not Found` — no paper with that id exists.
+- `400 Bad Request` — malformed UUID.
+- `401 Unauthorized` — write token required and missing or invalid.
+
+## Control Panel
+
+### `GET /panel`
+
+Serves the embedded server control panel UI. The panel is open (no auth
+required) and provides a visual interface for paper management: uploading PDFs,
+triggering arXiv harvests, browsing the paper list, viewing paper details,
+re-processing, regenerating cards, and hard-deleting papers. A **Papers** /
+**Settings** navigation is present; the Settings tab shows a placeholder
+(content in a follow-up).
+
+- `200 OK` with `Content-Type: text/html` — the panel HTML.
+
+### `GET /panel/static/*`
+
+Serves the embedded static assets (CSS, JavaScript) required by the control
+panel. These are referenced by the panel HTML and are fetched automatically by
+the browser; they do not require auth.
+
+- `200 OK` with the appropriate `Content-Type` for the asset.
+- `404 Not Found` — the requested asset does not exist.
 
 ## Worker Parse Pipeline
 

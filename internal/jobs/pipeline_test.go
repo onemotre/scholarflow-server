@@ -104,6 +104,10 @@ func (s *fakePipelineStore) Put(ctx context.Context, key string, body io.Reader,
 	}, nil
 }
 
+func (s *fakePipelineStore) Delete(ctx context.Context, key string) error {
+	return nil
+}
+
 type fakeParser struct {
 	filename string
 	body     string

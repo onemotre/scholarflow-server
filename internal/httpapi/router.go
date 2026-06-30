@@ -12,6 +12,8 @@ type Dependencies struct {
 	RetryHandler       *RetryHandler
 	FigureImageHandler *FigureImageHandler
 	HarvestHandler     *HarvestHandler
+	AdminHandler       *AdminHandler
+	PanelHandler       *PanelHandler
 	WriteAPIToken      string
 }
 
@@ -30,6 +32,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	if deps.FigureImageHandler != nil {
 		r.Get("/v1/papers/{id}/figures/{figureId}/image", deps.FigureImageHandler.GetFigureImage)
+	}
+
+	// Control panel — open routes (no auth required).
+	if deps.PanelHandler != nil {
+		r.Get("/panel", deps.PanelHandler.Page)
+		r.Handle("/panel/static/*", deps.PanelHandler.Static())
 	}
 
 	// Protected write endpoints. RequireToken is a pass-through when the
@@ -57,6 +65,12 @@ func NewRouter(deps Dependencies) http.Handler {
 			harvest = deps.HarvestHandler.TriggerArxiv
 		}
 		pr.Post("/v1/harvest/arxiv", harvest)
+
+		if deps.AdminHandler != nil {
+			pr.Delete("/v1/papers/{id}", deps.AdminHandler.DeletePaper)
+			pr.Post("/v1/papers/{id}/reprocess", deps.AdminHandler.Reprocess)
+			pr.Post("/v1/papers/{id}/reread", deps.AdminHandler.RegenerateCard)
+		}
 	})
 
 	return r

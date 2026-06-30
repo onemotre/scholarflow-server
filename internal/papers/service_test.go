@@ -40,6 +40,7 @@ func (s *fakeStore) Put(ctx context.Context, key string, body io.Reader, size in
 func (s *fakeStore) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader("")), nil
 }
+func (s *fakeStore) Delete(ctx context.Context, key string) error { return nil }
 
 type fakeEnqueuer struct{ calls int }
 

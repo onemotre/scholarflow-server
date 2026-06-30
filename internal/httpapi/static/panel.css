@@ -1,0 +1,28 @@
+:root { --fg:#1a1a1a; --muted:#777; --line:#ddd; --accent:#2b6cb0; --danger:#c53030; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; color: var(--fg); padding: 0 1.5rem 3rem; max-width: 1000px; margin: 0 auto; }
+header { padding: 1.25rem 0; border-bottom: 1px solid var(--line); }
+h1 { font-size: 1.4rem; margin: 0 0 .75rem; }
+h2 { font-size: 1.1rem; }
+.muted { color: var(--muted); font-size: .85rem; }
+.token-bar { display: flex; gap: .5rem; align-items: end; flex-wrap: wrap; }
+.token-bar input { width: 320px; }
+input, button { padding: .4rem .6rem; font-size: .9rem; }
+button { cursor: pointer; border: 1px solid var(--line); background: #f7f7f7; border-radius: 4px; }
+button:hover { background: #efefef; }
+#tabs { display: flex; gap: .25rem; margin-top: 1rem; }
+#tabs .tab { border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0; }
+#tabs .tab.active { border-bottom-color: var(--accent); font-weight: 600; }
+[hidden] { display: none !important; }
+section { margin-top: 1.5rem; }
+.add form { display: flex; gap: .5rem; align-items: end; flex-wrap: wrap; margin-bottom: .75rem; }
+label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
+table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+th, td { text-align: left; padding: .5rem .4rem; border-bottom: 1px solid var(--line); font-size: .9rem; vertical-align: top; }
+.list-head { display: flex; justify-content: space-between; align-items: center; }
+.actions button { margin-right: .25rem; }
+.actions .danger { color: var(--danger); border-color: var(--danger); }
+.status { font-variant: small-caps; }
+.toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: .6rem 1rem; border-radius: 6px; font-size: .9rem; }
+dialog { max-width: 700px; width: 90%; border: 1px solid var(--line); border-radius: 8px; }
+dialog pre { white-space: pre-wrap; word-break: break-word; background: #fafafa; padding: .75rem; border-radius: 6px; }
