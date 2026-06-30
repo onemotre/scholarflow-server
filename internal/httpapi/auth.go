@@ -8,16 +8,21 @@ import (
 
 const bearerPrefix = "Bearer "
 
-// RequireToken returns a chi-compatible middleware that requires
-// "Authorization: Bearer <token>" on the wrapped routes. When token is empty
-// the middleware is a pass-through (auth disabled), matching the project's
-// "blank = feature off" convention.
-func RequireToken(token string) func(http.Handler) http.Handler {
+// RequireToken returns middleware that requires "Authorization: Bearer <token>"
+// where the expected token is read from tokenFn on each request. When tokenFn is
+// nil or returns "", auth is disabled (pass-through), matching the project's
+// "blank = feature off" convention. Reading per request makes the token live.
+func RequireToken(tokenFn func() string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		if token == "" {
-			return next
-		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := ""
+			if tokenFn != nil {
+				token = tokenFn()
+			}
+			if token == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 			header := r.Header.Get("Authorization")
 			if !strings.HasPrefix(header, bearerPrefix) {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)

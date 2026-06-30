@@ -32,7 +32,8 @@ func TestRequireToken(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			h := RequireToken(tc.token)(next)
+			tok := tc.token
+			h := RequireToken(func() string { return tok })(next)
 			req := httptest.NewRequest(http.MethodPost, "/v1/uploads/papers", nil)
 			if tc.authHeader != "" {
 				req.Header.Set("Authorization", tc.authHeader)

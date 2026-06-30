@@ -64,7 +64,7 @@ func main() {
 		HarvestHandler:     harvestHandler,
 		AdminHandler:       adminHandler,
 		PanelHandler:       panelHandler,
-		WriteAPIToken:      cfg.WriteAPIToken,
+		WriteAPITokenFn:    func() string { return cfg.WriteAPIToken },
 	})); err != nil {
 		log.Fatal(err)
 	}

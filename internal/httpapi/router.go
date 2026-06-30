@@ -15,7 +15,7 @@ type Dependencies struct {
 	AdminHandler       *AdminHandler
 	PanelHandler       *PanelHandler
 	SettingsHandler    *SettingsHandler
-	WriteAPIToken      string
+	WriteAPITokenFn    func() string
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -47,7 +47,11 @@ func NewRouter(deps Dependencies) http.Handler {
 	// matching for unauthenticated requests; a nil handler falls back to
 	// http.NotFound (unreachable when the token is enforced).
 	r.Group(func(pr chi.Router) {
-		pr.Use(RequireToken(deps.WriteAPIToken))
+		tokenFn := deps.WriteAPITokenFn
+		if tokenFn == nil {
+			tokenFn = func() string { return "" }
+		}
+		pr.Use(RequireToken(tokenFn))
 
 		var uploadPaper http.HandlerFunc = http.NotFound
 		if deps.UploadHandler != nil {
