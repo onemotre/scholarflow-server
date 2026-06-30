@@ -12,6 +12,7 @@ type Dependencies struct {
 	RetryHandler       *RetryHandler
 	FigureImageHandler *FigureImageHandler
 	HarvestHandler     *HarvestHandler
+	AdminHandler       *AdminHandler
 	WriteAPIToken      string
 }
 
@@ -57,6 +58,12 @@ func NewRouter(deps Dependencies) http.Handler {
 			harvest = deps.HarvestHandler.TriggerArxiv
 		}
 		pr.Post("/v1/harvest/arxiv", harvest)
+
+		if deps.AdminHandler != nil {
+			pr.Delete("/v1/papers/{id}", deps.AdminHandler.DeletePaper)
+			pr.Post("/v1/papers/{id}/reprocess", deps.AdminHandler.Reprocess)
+			pr.Post("/v1/papers/{id}/reread", deps.AdminHandler.RegenerateCard)
+		}
 	})
 
 	return r
