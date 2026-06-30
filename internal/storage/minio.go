@@ -56,3 +56,7 @@ func (s *MinIOStore) Put(ctx context.Context, key string, body io.Reader, size i
 func (s *MinIOStore) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 }
+
+func (s *MinIOStore) Delete(ctx context.Context, key string) error {
+	return s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
+}
