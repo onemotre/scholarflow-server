@@ -18,6 +18,7 @@ import (
 	"scholarflow_server/internal/papers"
 	"scholarflow_server/internal/parser"
 	"scholarflow_server/internal/reader"
+	"scholarflow_server/internal/settings"
 	"scholarflow_server/internal/sources"
 	"scholarflow_server/internal/storage"
 )
@@ -36,6 +37,10 @@ func main() {
 	}
 	defer pool.Close()
 
+	queries := dbpkg.New(pool)
+	settingsProvider := settings.NewProvider(settings.NewSQLRepository(queries), 5*time.Second)
+	cfg = settingsProvider.Snapshot(ctx) // DB overrides applied at startup
+
 	store, err := storage.NewMinIOStore(cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIOBucket, cfg.MinIOUseSSL)
 	if err != nil {
 		log.Fatal(err)
@@ -44,7 +49,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	repo := jobs.NewSQLRepository(dbpkg.New(pool))
+	repo := jobs.NewSQLRepository(queries)
 	redisOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr}
 
 	mux := asynq.NewServeMux()
@@ -91,7 +96,7 @@ func main() {
 		harvestClient := asynq.NewClient(redisOpt)
 		defer harvestClient.Close()
 		processEnqueuer := jobs.NewEnqueuer(harvestClient, cfg.ReadMaxRetry)
-		papersRepo := papers.NewSQLRepository(dbpkg.New(pool))
+		papersRepo := papers.NewSQLRepository(queries)
 		ingestService := papers.NewService(papersRepo, store, processEnqueuer)
 
 		arxivClient := arxiv.NewClient(cfg.ArxivAPIBaseURL, time.Duration(cfg.ArxivRequestDelaySeconds)*time.Second)
