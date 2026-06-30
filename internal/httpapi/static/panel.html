@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScholarFlow Control Panel</title>
+  <link rel="stylesheet" href="/panel/static/panel.css">
+</head>
+<body>
+  <header>
+    <h1>ScholarFlow Control Panel</h1>
+    <div class="token-bar">
+      <label>Write token
+        <input id="token" type="password" placeholder="WRITE_API_TOKEN (blank if disabled)">
+      </label>
+      <button id="save-token">Save</button>
+      <button id="clear-token">Clear</button>
+      <span id="token-state" class="muted"></span>
+    </div>
+    <nav id="tabs">
+      <button class="tab active" data-view="papers">Papers</button>
+      <button class="tab" data-view="settings">Settings</button>
+    </nav>
+  </header>
+
+  <div id="papers-view">
+    <section class="add">
+      <h2>Add papers</h2>
+      <form id="upload-form">
+        <label>Upload PDF <input id="pdf" type="file" accept="application/pdf" required></label>
+        <button type="submit">Upload</button>
+      </form>
+      <form id="harvest-form">
+        <label>Harvest arXiv categories (comma-separated, blank = configured)
+          <input id="categories" type="text" placeholder="cs.AI, cs.LG">
+        </label>
+        <button type="submit">Trigger harvest</button>
+      </form>
+    </section>
+
+    <section class="list">
+      <div class="list-head">
+        <h2>Papers</h2>
+        <button id="refresh">Refresh</button>
+      </div>
+      <table id="papers">
+        <thead>
+          <tr><th>Title</th><th>Source</th><th>Status</th><th>Year</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="settings-view" hidden>
+    <section class="settings">
+      <h2>Settings</h2>
+      <p class="muted">Runtime settings management is delivered by the settings-system plan (Plan 2). This container is intentionally left for that plan to populate.</p>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <dialog id="detail"></dialog>
+
+  <script src="/panel/static/panel.js"></script>
+</body>
+</html>

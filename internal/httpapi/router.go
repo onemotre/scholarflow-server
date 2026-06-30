@@ -13,6 +13,7 @@ type Dependencies struct {
 	FigureImageHandler *FigureImageHandler
 	HarvestHandler     *HarvestHandler
 	AdminHandler       *AdminHandler
+	PanelHandler       *PanelHandler
 	WriteAPIToken      string
 }
 
@@ -31,6 +32,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	if deps.FigureImageHandler != nil {
 		r.Get("/v1/papers/{id}/figures/{figureId}/image", deps.FigureImageHandler.GetFigureImage)
+	}
+
+	// Control panel — open routes (no auth required).
+	if deps.PanelHandler != nil {
+		r.Get("/panel", deps.PanelHandler.Page)
+		r.Handle("/panel/static/*", deps.PanelHandler.Static())
 	}
 
 	// Protected write endpoints. RequireToken is a pass-through when the
