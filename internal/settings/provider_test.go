@@ -158,8 +158,8 @@ func TestProviderEffectiveMasksNothingButReportsSource(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv("WRITE_API_TOKEN", "")
 	var model, token *EffectiveSetting
-	for i := range p.Effective(ctx) {
-		es := p.Effective(ctx)[i]
+	for _, es := range p.Effective(ctx) {
+		es := es // avoid aliasing the loop variable
 		if es.Key == "OPENAI_MODEL" {
 			model = &es
 		}

@@ -65,22 +65,27 @@ func (p *Provider) bust() {
 func (p *Provider) overrideMap(ctx context.Context) map[string]string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.loaded && p.now().Sub(p.fetchedAt) < p.ttl {
-		return p.overrides
-	}
-	data, err := p.repo.List(ctx)
-	if err != nil {
-		// On a transient repo error, fall back to the last known map (or empty);
-		// settings resolution must never hard-fail a request.
-		if p.overrides == nil {
-			p.overrides = map[string]string{}
+	if !p.loaded || p.now().Sub(p.fetchedAt) >= p.ttl {
+		data, err := p.repo.List(ctx)
+		if err != nil {
+			// On a transient repo error, fall back to the last known map (or empty);
+			// settings resolution must never hard-fail a request.
+			if p.overrides == nil {
+				p.overrides = map[string]string{}
+			}
+		} else {
+			p.overrides = data
+			p.fetchedAt = p.now()
+			p.loaded = true
 		}
-		return p.overrides
 	}
-	p.overrides = data
-	p.fetchedAt = p.now()
-	p.loaded = true
-	return p.overrides
+	// Return a defensive copy so callers cannot race against a future cache
+	// replacement (e.g. bust() + concurrent refetch) through the returned pointer.
+	out := make(map[string]string, len(p.overrides))
+	for k, v := range p.overrides {
+		out[k] = v
+	}
+	return out
 }
 
 // rawWithSource resolves a key to its effective raw value and the source layer.
