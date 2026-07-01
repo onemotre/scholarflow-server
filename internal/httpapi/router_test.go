@@ -20,7 +20,7 @@ func doReq(t *testing.T, h http.Handler, method, path, auth string) int {
 
 func TestRouterAuthSplit(t *testing.T) {
 	// Token set: healthz open, write blocked without token.
-	h := NewRouter(Dependencies{WriteAPIToken: "tok"})
+	h := NewRouter(Dependencies{WriteAPITokenFn: func() string { return "tok" }})
 
 	if code := doReq(t, h, http.MethodGet, "/healthz", ""); code != http.StatusOK {
 		t.Fatalf("healthz = %d, want 200", code)

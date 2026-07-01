@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/hibiken/asynq"
 
@@ -13,6 +14,7 @@ import (
 	"scholarflow_server/internal/jobs"
 	"scholarflow_server/internal/migrate"
 	"scholarflow_server/internal/papers"
+	"scholarflow_server/internal/settings"
 	"scholarflow_server/internal/storage"
 )
 
@@ -42,6 +44,9 @@ func main() {
 	defer asynqClient.Close()
 
 	queries := dbpkg.New(pool)
+	settingsProvider := settings.NewProvider(settings.NewSQLRepository(queries), 5*time.Second)
+	cfg = settingsProvider.Snapshot(ctx) // DB overrides applied; bootstrap values unchanged
+
 	repo := papers.NewSQLRepository(queries)
 	enqueuer := jobs.NewEnqueuer(asynqClient, cfg.ReadMaxRetry)
 	paperService := papers.NewService(repo, store, enqueuer)
@@ -54,6 +59,7 @@ func main() {
 	adminService := papers.NewAdminService(readRepo, store, enqueuer)
 	adminHandler := httpapi.NewAdminHandler(adminService)
 	panelHandler := httpapi.NewPanelHandler()
+	settingsHandler := httpapi.NewSettingsHandler(settingsProvider)
 
 	log.Printf("starting api on %s", cfg.HTTPAddr)
 	if err := http.ListenAndServe(cfg.HTTPAddr, httpapi.NewRouter(httpapi.Dependencies{
@@ -64,7 +70,8 @@ func main() {
 		HarvestHandler:     harvestHandler,
 		AdminHandler:       adminHandler,
 		PanelHandler:       panelHandler,
-		WriteAPIToken:      cfg.WriteAPIToken,
+		SettingsHandler:    settingsHandler,
+		WriteAPITokenFn:    func() string { return settingsProvider.String(context.Background(), "WRITE_API_TOKEN") },
 	})); err != nil {
 		log.Fatal(err)
 	}

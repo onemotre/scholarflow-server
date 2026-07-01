@@ -14,13 +14,18 @@
 - `POST /v1/harvest/arxiv`
 - `GET /panel`
 - `GET /panel/static/*`
+- `GET /v1/settings`
+- `PUT /v1/settings`
+- `DELETE /v1/settings/{key}`
 
 ## Authentication
 
 The write endpoints — `POST /v1/uploads/papers`, `POST /v1/jobs/{id}/retry`,
 `POST /v1/harvest/arxiv`, `DELETE /v1/papers/{id}`,
-`POST /v1/papers/{id}/reprocess`, and `POST /v1/papers/{id}/reread` — require a
-bearer token when `WRITE_API_TOKEN` is configured on the server. Send it as:
+`POST /v1/papers/{id}/reprocess`, `POST /v1/papers/{id}/reread`,
+`GET /v1/settings`, `PUT /v1/settings`, and `DELETE /v1/settings/{key}` —
+require a bearer token when `WRITE_API_TOKEN` is configured on the server.
+Send it as:
 
     Authorization: Bearer <WRITE_API_TOKEN>
 
@@ -189,6 +194,96 @@ the browser; they do not require auth.
 
 - `200 OK` with the appropriate `Content-Type` for the asset.
 - `404 Not Found` — the requested asset does not exist.
+
+## Settings
+
+Runtime settings are registry-driven: each setting has an `apply` mode
+(`live`, `restart`, or `bootstrap`), a `kind` (`string`, `bool`, or `int`), and
+an optional `secret` flag. The effective value follows DB override → env var →
+hardcoded default. Bootstrap settings (infrastructure: database URL, Redis,
+MinIO, HTTP listen address) cannot be overridden via the API — they are
+read-only to prevent the server from writing itself into an unreachable state.
+
+**Authentication:** all three endpoints require the write token (same
+`Authorization: Bearer` mechanism as other write endpoints).
+
+**Live vs restart:** only `WRITE_API_TOKEN` applies live (re-read on each
+request). All other editable settings are snapshotted at startup and apply on
+api/worker restart. This is documented per-setting in the `apply` field.
+
+### `GET /v1/settings`
+
+Returns the full settings registry with effective values. Secret settings have
+their value omitted — only `is_set` (bool) and `source` are exposed.
+
+Response shape:
+
+```json
+{
+  "settings": [
+    {
+      "key": "OPENAI_MODEL",
+      "group": "reader",
+      "kind": "string",
+      "apply": "restart",
+      "secret": false,
+      "label": "OpenAI model",
+      "help": "Model name passed to the chat completions API.",
+      "source": "default",
+      "value": "gpt-4o",
+      "is_set": true
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "group": "reader",
+      "kind": "string",
+      "apply": "restart",
+      "secret": true,
+      "label": "OpenAI API key",
+      "help": "Secret key for the OpenAI-compatible API.",
+      "source": "env",
+      "is_set": true
+    }
+  ]
+}
+```
+
+Field notes:
+
+- `apply` — `live` (takes effect per request), `restart` (applies after api/worker restart), or `bootstrap` (non-editable infrastructure setting).
+- `source` — `db` (DB override active), `env` (env var set, no DB override), or `default` (hardcoded default in use).
+- `value` — present for non-secret settings; absent for `secret: true` settings regardless of source.
+- `is_set` — `true` if the effective value is non-empty; always present including for secrets.
+
+- `200 OK` — JSON body as above.
+- `401 Unauthorized` — write token required and missing or invalid.
+
+### `PUT /v1/settings`
+
+Upserts a DB override for a setting, making `source` flip to `db` for that key.
+
+Request body:
+
+```json
+{ "key": "OPENAI_MODEL", "value": "gpt-4o-mini" }
+```
+
+- `204 No Content` — override persisted. For `WRITE_API_TOKEN` the change takes effect immediately; all other settings apply on next api/worker restart.
+- `400 Bad Request` — malformed JSON body, missing `key`/`value`, or the value fails validation for the setting's `kind`.
+- `404 Not Found` — `key` is not a known setting.
+- `409 Conflict` — the key is a `bootstrap` setting and cannot be overridden.
+- `401 Unauthorized` — write token required and missing or invalid.
+
+### `DELETE /v1/settings/{key}`
+
+Removes the DB override for a setting, resetting it to its env var or hardcoded
+default. Has no effect if no DB override exists (idempotent on the effective
+value).
+
+- `204 No Content` — DB override removed (or no override was present).
+- `404 Not Found` — `{key}` is not a known setting.
+- `409 Conflict` — the key is a `bootstrap` setting.
+- `401 Unauthorized` — write token required and missing or invalid.
 
 ## Worker Parse Pipeline
 
