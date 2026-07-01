@@ -35,6 +35,7 @@ const (
 
 type PipelineRepository interface {
 	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error
+	UpdatePaperStatus(ctx context.Context, paperID uuid.UUID, status string) error
 	GetPaperPDFAsset(ctx context.Context, paperID uuid.UUID) (storage.Object, error)
 	CreateTEIAsset(ctx context.Context, paperID uuid.UUID, asset storage.Object) error
 	SaveParsedPaper(ctx context.Context, paperID uuid.UUID, parsed parser.ParsedPaper) error
@@ -63,14 +64,21 @@ func (p *Pipeline) ProcessPaper(ctx context.Context, payload ProcessPaperPayload
 	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusProcessing, nil, 0); err != nil {
 		return fmt.Errorf("mark job processing: %w", err)
 	}
+	if err := p.repo.UpdatePaperStatus(ctx, payload.PaperID, StatusProcessing); err != nil {
+		return fmt.Errorf("mark paper processing: %w", err)
+	}
 	err := p.process(ctx, payload)
 	if err != nil {
 		message := err.Error()
 		if markErr := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusFailed, &message, 1); markErr != nil {
 			return fmt.Errorf("%w; mark job failed: %v", err, markErr)
 		}
+		if markErr := p.repo.UpdatePaperStatus(ctx, payload.PaperID, StatusFailed); markErr != nil {
+			return fmt.Errorf("%w; mark paper failed: %v", err, markErr)
+		}
 		return err
 	}
+	// paper status is set to 'parsed' by SaveParsedPaper inside process().
 	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusParsed, nil, 0); err != nil {
 		return fmt.Errorf("mark job parsed: %w", err)
 	}

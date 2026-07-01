@@ -39,6 +39,7 @@ type ReadContext struct {
 
 type ReadRepository interface {
 	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error
+	UpdatePaperStatus(ctx context.Context, paperID uuid.UUID, status string) error
 	SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attempt int32) error
 	GetReadContext(ctx context.Context, paperID uuid.UUID) (ReadContext, error)
 	SavePaperCard(ctx context.Context, paperID uuid.UUID, model, schemaVersion string, card reader.PaperCard, sectionIDByLabel map[string]uuid.UUID) error
@@ -58,6 +59,9 @@ func (p *ReadPipeline) ReadPaper(ctx context.Context, payload ProcessPaperPayloa
 	if err := p.repo.UpdateJobStatus(ctx, payload.JobID, StatusReading, nil, 0); err != nil {
 		return fmt.Errorf("mark job reading: %w", err)
 	}
+	if err := p.repo.UpdatePaperStatus(ctx, payload.PaperID, StatusReading); err != nil {
+		return fmt.Errorf("mark paper reading: %w", err)
+	}
 	err := p.read(ctx, payload)
 	if err != nil {
 		log.Printf("read failed paper=%s job=%s attempt=%d final=%t: %v", payload.PaperID, payload.JobID, attempt, isFinalAttempt, err)
@@ -69,10 +73,20 @@ func (p *ReadPipeline) ReadPaper(ctx context.Context, payload ProcessPaperPayloa
 		if markErr := p.repo.SetReadJobOutcome(ctx, payload.JobID, status, &message, attempt); markErr != nil {
 			return fmt.Errorf("%w; mark job outcome: %v", err, markErr)
 		}
+		// Only a final (retries-exhausted) failure marks the paper failed; a
+		// non-final failure leaves it 'reading' so a retry can resume it.
+		if isFinalAttempt {
+			if markErr := p.repo.UpdatePaperStatus(ctx, payload.PaperID, StatusFailed); markErr != nil {
+				return fmt.Errorf("%w; mark paper failed: %v", err, markErr)
+			}
+		}
 		return err
 	}
 	if err := p.repo.SetReadJobOutcome(ctx, payload.JobID, StatusCompleted, nil, attempt); err != nil {
 		return fmt.Errorf("mark job completed: %w", err)
+	}
+	if err := p.repo.UpdatePaperStatus(ctx, payload.PaperID, StatusCompleted); err != nil {
+		return fmt.Errorf("mark paper completed: %w", err)
 	}
 	return nil
 }

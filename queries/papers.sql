@@ -14,6 +14,12 @@ SET title = $2,
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdatePaperStatus :exec
+UPDATE papers
+SET status = $2,
+    updated_at = now()
+WHERE id = $1;
+
 -- name: GetPaper :one
 SELECT * FROM papers WHERE id = $1;
 

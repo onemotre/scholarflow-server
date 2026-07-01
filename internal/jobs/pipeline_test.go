@@ -22,6 +22,7 @@ type figureAttach struct {
 
 type fakePipelineRepo struct {
 	statuses            []string
+	paperStatuses       []string
 	pdfAsset            storage.Object
 	teiAsset            storage.Object
 	saved               parser.ParsedPaper
@@ -38,6 +39,14 @@ func (r *fakePipelineRepo) UpdateJobStatus(ctx context.Context, jobID uuid.UUID,
 		return r.failStatus
 	}
 	r.statuses = append(r.statuses, status)
+	return nil
+}
+
+func (r *fakePipelineRepo) UpdatePaperStatus(ctx context.Context, paperID uuid.UUID, status string) error {
+	if r.failStatus != nil {
+		return r.failStatus
+	}
+	r.paperStatuses = append(r.paperStatuses, status)
 	return nil
 }
 
@@ -58,6 +67,8 @@ func (r *fakePipelineRepo) SaveParsedPaper(ctx context.Context, paperID uuid.UUI
 		return r.failSaveParsed
 	}
 	r.saved = parsed
+	// Mirrors the real repo: SaveParsedPaper sets papers.status = parsed.
+	r.paperStatuses = append(r.paperStatuses, StatusParsed)
 	return nil
 }
 
@@ -258,6 +269,9 @@ func TestPipelineProcessesPaperToParsed(t *testing.T) {
 	if got := strings.Join(repo.statuses, ","); got != "processing,parsed" {
 		t.Fatalf("statuses = %s", got)
 	}
+	if got := strings.Join(repo.paperStatuses, ","); got != "processing,parsed" {
+		t.Fatalf("paper statuses = %s", got)
+	}
 	if store.getKey != "papers/input.pdf" {
 		t.Fatalf("Get key = %q", store.getKey)
 	}
@@ -288,6 +302,9 @@ func TestPipelineMarksJobFailedWhenParserFails(t *testing.T) {
 	}
 	if got := strings.Join(repo.statuses, ","); got != "processing,failed" {
 		t.Fatalf("statuses = %s", got)
+	}
+	if got := strings.Join(repo.paperStatuses, ","); got != "processing,failed" {
+		t.Fatalf("paper statuses = %s", got)
 	}
 }
 

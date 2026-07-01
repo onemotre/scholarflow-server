@@ -1002,6 +1002,23 @@ func (q *Queries) UpdatePaperMetadata(ctx context.Context, arg UpdatePaperMetada
 	return i, err
 }
 
+const updatePaperStatus = `-- name: UpdatePaperStatus :exec
+UPDATE papers
+SET status = $2,
+    updated_at = now()
+WHERE id = $1
+`
+
+type UpdatePaperStatusParams struct {
+	ID     uuid.UUID
+	Status string
+}
+
+func (q *Queries) UpdatePaperStatus(ctx context.Context, arg UpdatePaperStatusParams) error {
+	_, err := q.db.Exec(ctx, updatePaperStatus, arg.ID, arg.Status)
+	return err
+}
+
 const updateProcessingJobStatus = `-- name: UpdateProcessingJobStatus :one
 UPDATE paper_processing_jobs
 SET status = $2,

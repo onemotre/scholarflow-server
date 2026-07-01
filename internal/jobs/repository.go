@@ -35,6 +35,16 @@ func (r *SQLRepository) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, st
 	return err
 }
 
+// UpdatePaperStatus advances the papers.status column independently of the job
+// row, so the paper's status reflects the full lifecycle (processing, reading,
+// completed, failed) rather than stalling at 'parsed'.
+func (r *SQLRepository) UpdatePaperStatus(ctx context.Context, paperID uuid.UUID, status string) error {
+	return r.queries.UpdatePaperStatus(ctx, db.UpdatePaperStatusParams{
+		ID:     paperID,
+		Status: status,
+	})
+}
+
 func (r *SQLRepository) SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attempt int32) error {
 	_, err := r.queries.SetJobStatusAndAttempt(ctx, db.SetJobStatusAndAttemptParams{
 		ID:           jobID,

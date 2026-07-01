@@ -18,12 +18,13 @@ type recordedOutcome struct {
 }
 
 type fakeReadRepo struct {
-	statuses []string
-	rc       ReadContext
-	saved    reader.PaperCard
-	savedMap map[string]uuid.UUID
-	failSave error
-	outcomes []recordedOutcome
+	statuses      []string
+	paperStatuses []string
+	rc            ReadContext
+	saved         reader.PaperCard
+	savedMap      map[string]uuid.UUID
+	failSave      error
+	outcomes      []recordedOutcome
 }
 
 func (r *fakeReadRepo) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errorMessage *string, attemptIncrement int32) error {
@@ -38,6 +39,11 @@ func (r *fakeReadRepo) SetReadJobOutcome(ctx context.Context, jobID uuid.UUID, s
 	}
 	r.statuses = append(r.statuses, status)
 	r.outcomes = append(r.outcomes, recordedOutcome{status: status, errMsg: msg, attempt: attempt})
+	return nil
+}
+
+func (r *fakeReadRepo) UpdatePaperStatus(ctx context.Context, paperID uuid.UUID, status string) error {
+	r.paperStatuses = append(r.paperStatuses, status)
 	return nil
 }
 
@@ -82,6 +88,9 @@ func TestReadPipelineCompletes(t *testing.T) {
 	}
 	if got := strings.Join(repo.statuses, ","); got != "reading,completed" {
 		t.Fatalf("statuses = %s", got)
+	}
+	if got := strings.Join(repo.paperStatuses, ","); got != "reading,completed" {
+		t.Fatalf("paper statuses = %s", got)
 	}
 	if len(repo.saved.Methodology) != 1 || repo.saved.Methodology[0].Method != "m" {
 		t.Fatalf("saved methodology = %#v", repo.saved.Methodology)
@@ -160,6 +169,10 @@ func TestReadPipelineNonFinalFailureStaysReading(t *testing.T) {
 	if last.attempt != 1 || last.errMsg == "" {
 		t.Fatalf("outcome = %#v, want attempt 1 with error", last)
 	}
+	// A non-final read failure must NOT mark the paper failed — it stays reading.
+	if got := strings.Join(repo.paperStatuses, ","); got != "reading" {
+		t.Fatalf("paper statuses = %s, want reading", got)
+	}
 }
 
 func TestReadPipelineFinalFailureMarksFailed(t *testing.T) {
@@ -177,5 +190,8 @@ func TestReadPipelineFinalFailureMarksFailed(t *testing.T) {
 	}
 	if last.attempt != 4 {
 		t.Fatalf("final attempt = %d, want 4", last.attempt)
+	}
+	if got := strings.Join(repo.paperStatuses, ","); got != "reading,failed" {
+		t.Fatalf("paper statuses = %s, want reading,failed", got)
 	}
 }
