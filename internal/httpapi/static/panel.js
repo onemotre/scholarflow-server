@@ -25,7 +25,10 @@ function toast(msg) {
   toast._t = setTimeout(() => { el.hidden = true; }, 3000);
 }
 async function api(method, url, opts = {}) {
-  const headers = method === "GET" ? {} : authHeaders();
+  // Attach the token on every request. Open endpoints (papers/jobs) ignore it;
+  // protected reads like GET /v1/settings require it. authHeaders() is empty
+  // when no token is stored, so the no-token case is unchanged.
+  const headers = authHeaders();
   const resp = await fetch(url, { method, headers: { ...headers, ...(opts.headers || {}) }, body: opts.body });
   if (!resp.ok) {
     const text = await resp.text();
